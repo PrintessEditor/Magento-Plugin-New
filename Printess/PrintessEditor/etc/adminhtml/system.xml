@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <tab id="printess" translate="label" sortOrder="500">
+            <label>Printess</label>
+        </tab>
+        <section id="printess_editor" translate="label" type="text" sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="1">
+            <label>Printess Editor</label>
+            <tab>printess</tab>
+            <resource>Printess_PrintessEditor::config</resource>
+            <group id="api" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>API Settings</label>
+                <field id="shop_token" translate="label" type="obscure" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Shop Token (Frontend)</label>
+                    <comment>Used in the browser to load the editor. Find it in the Printess account menu under API-Token.</comment>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                </field>
+                <field id="service_token" translate="label" type="obscure" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Service Token (Backend / PDF Production)</label>
+                    <comment>Used server-side to trigger production. Never expose this in the browser.</comment>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                </field>
+            </group>
+            <group id="editor" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Editor Appearance</label>
+                <field id="theme" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Editor Theme</label>
+                    <source_model>Printess\PrintessEditor\Model\Config\Source\EditorTheme</source_model>
+                    <comment>Default theme for all Printess editors in this store. Can be overridden per product.</comment>
+                </field>
+            </group>
+            <group id="production" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Print Settings</label>
+                <field id="print_settings" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Print Settings</label>
+                    <source_model>Printess\PrintessEditor\Model\Config\Source\PrintSettings</source_model>
+                    <comment>Select the named print settings to use when producing PDFs. Options are loaded from your Printess account.</comment>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>

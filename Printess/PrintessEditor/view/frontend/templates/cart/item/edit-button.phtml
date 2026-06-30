@@ -1,0 +1,30 @@
+<?php
+/** @var \Printess\PrintessEditor\Block\Cart\EditButton $block */
+if (!$block->isPrintessItem()) {
+    return;
+}
+
+$itemData = $block->getItemData();
+$uid      = uniqid('pe_');
+?>
+
+<span class="action action-edit printess-cart-edit"
+      id="printess-edit-<?= /* @noEscape */ $uid ?>"
+      style="cursor:pointer;"
+      title="<?= $block->escapeHtmlAttr(__('Customize')) ?>">
+    <?= $block->escapeHtml(__('Customize')) ?>
+</span>
+
+<script>
+require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessEditor) {
+    document.getElementById('printess-edit-<?= /* @noEscape */ $uid ?>').addEventListener('click', function () {
+        PrintessEditor.openFromCart({
+            shopToken:  <?= /* @noEscape */ json_encode($itemData['shopToken']) ?>,
+            saveToken:  <?= /* @noEscape */ json_encode($itemData['saveToken']) ?>,
+            itemId:     <?= /* @noEscape */ (int)$itemData['itemId'] ?>,
+            updateUrl:  '<?= $block->escapeUrl($block->getUrl('printess/cart/update')) ?>',
+            formKey:    window.FORM_KEY || document.querySelector('[name="form_key"]')?.value || ''
+        });
+    });
+});
+</script>

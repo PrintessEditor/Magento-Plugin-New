@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <!--
+            Override the add-to-cart block template for every product.
+            The template checks $product->getData('printess_template') at render
+            time and swaps the button accordingly — Printess products get
+            "Customize", all others get the standard "Add to Cart".
+        -->
+        <referenceBlock name="product.info.addtocart">
+            <action method="setTemplate">
+                <argument name="template" xsi:type="string">Printess_PrintessEditor::product/view/addtocart.phtml</argument>
+            </action>
+            <arguments>
+                <argument name="printessData" xsi:type="object">Printess\PrintessEditor\ViewModel\Product\PrintessData</argument>
+            </arguments>
+        </referenceBlock>
+        <referenceBlock name="product.info.addtocart.additional">
+            <action method="setTemplate">
+                <argument name="template" xsi:type="string">Printess_PrintessEditor::product/view/addtocart.phtml</argument>
+            </action>
+            <arguments>
+                <argument name="printessData" xsi:type="object">Printess\PrintessEditor\ViewModel\Product\PrintessData</argument>
+            </arguments>
+        </referenceBlock>
+    </body>
+</page>

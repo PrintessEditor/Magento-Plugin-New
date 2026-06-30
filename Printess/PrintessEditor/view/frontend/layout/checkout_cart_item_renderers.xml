@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <!-- Override item renderer templates to show Printess thumbnail in place of product image -->
+        <referenceBlock name="checkout.cart.item.renderers.default">
+            <action method="setTemplate">
+                <argument name="template" xsi:type="string">Printess_PrintessEditor::cart/item/default.phtml</argument>
+            </action>
+        </referenceBlock>
+        <referenceBlock name="checkout.cart.item.renderers.simple">
+            <action method="setTemplate">
+                <argument name="template" xsi:type="string">Printess_PrintessEditor::cart/item/default.phtml</argument>
+            </action>
+        </referenceBlock>
+        <referenceBlock name="checkout.cart.item.renderers.configurable">
+            <action method="setTemplate">
+                <argument name="template" xsi:type="string">Printess_PrintessEditor::cart/item/default.phtml</argument>
+            </action>
+        </referenceBlock>
+
+        <!-- Printess edit/customize button in cart item actions -->
+        <referenceBlock name="checkout.cart.item.renderers.default.actions">
+            <block class="Printess\PrintessEditor\Block\Cart\EditButton"
+                   name="printess.cart.item.edit.default"
+                   template="Printess_PrintessEditor::cart/item/edit-button.phtml"
+                   before="checkout.cart.item.renderers.default.actions.edit"/>
+        </referenceBlock>
+        <referenceBlock name="checkout.cart.item.renderers.simple.actions">
+            <block class="Printess\PrintessEditor\Block\Cart\EditButton"
+                   name="printess.cart.item.edit.simple"
+                   template="Printess_PrintessEditor::cart/item/edit-button.phtml"
+                   before="checkout.cart.item.renderers.simple.actions.edit"/>
+        </referenceBlock>
+        <referenceBlock name="checkout.cart.item.renderers.configurable.actions">
+            <block class="Printess\PrintessEditor\Block\Cart\EditButton"
+                   name="printess.cart.item.edit.configurable"
+                   template="Printess_PrintessEditor::cart/item/edit-button.phtml"
+                   before="checkout.cart.item.renderers.configurable.actions.edit"/>
+        </referenceBlock>
+    </body>
+</page>

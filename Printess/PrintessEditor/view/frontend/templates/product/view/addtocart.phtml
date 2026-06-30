@@ -1,0 +1,243 @@
+<?php
+/**
+ * @var \Magento\Catalog\Block\Product\View $block
+ */
+$_product      = $block->getProduct();
+$_config       = $this->helper(\Printess\PrintessEditor\Helper\Config::class);
+$_printessData = $block->getData('printessData');
+$_isLoggedIn   = $_printessData->isLoggedIn();
+$_store        = $block->getProduct()->getStore();
+$_currencyCode = $_store->getCurrentCurrencyCode();
+$_locale       = $_printessData->getLocale();
+$_template       = (string)($_product->getData('printess_template') ?? '');
+$_mergeTemplate  = (string)($_product->getData('printess_merge_template') ?? '');
+$_shopToken = $_config->getShopToken();
+$_isSlimUi  = $_template !== '' && $_shopToken !== '' && (bool)$_product->getData('printess_slim_ui');
+$_isPrintess = $_template !== '' && $_shopToken !== '' && !$_isSlimUi;
+
+// Editor theme: product-level overrides shop-level
+$_productTheme = (string)($_product->getData('printess_theme') ?? '');
+$_theme        = $_productTheme !== '' ? $_productTheme : $_config->getEditorTheme();
+
+// Print settings: product-level overrides shop-level
+$_productPrintSettings = (string)($_product->getData('printess_print_settings') ?? '');
+$_printSettings        = $_productPrintSettings !== '' ? $_productPrintSettings : $_config->getPrintSettings();
+
+// Magic Photobook theme (product-level only)
+$_magicPhotobookTheme = (string)($_product->getData('printess_magic_photobook_theme') ?? '');
+
+// Per-page pricing
+$_pagePricing = json_encode($_product->getData('printess_page_pricing') ?: []);
+$_basePrice   = (float)$_product->getFinalPrice();
+
+// Auto variant sync: all configurable attributes, matched by label in JS
+$_variantOptions = [];
+if ($_product->getTypeId() === 'configurable') {
+    try {
+        /** @var \Magento\ConfigurableProduct\Model\Product\Type\Configurable $typeInstance */
+        $typeInstance = $_product->getTypeInstance();
+        foreach ($typeInstance->getConfigurableAttributes($_product) as $cfgAttr) {
+            $productAttr = $cfgAttr->getProductAttribute();
+            if (!$productAttr) continue;
+            $optionMap = [];
+            foreach ((array)$cfgAttr->getOptions() as $opt) {
+                $label = (string)($opt['label'] ?? '');
+                $vid   = (string)($opt['value_index'] ?? '');
+                if ($label !== '' && $vid !== '') {
+                    $optionMap[$label] = $vid;
+                }
+            }
+            $_variantOptions[] = [
+                'label'       => $productAttr->getFrontendLabel(),
+                'attributeId' => (string)$cfgAttr->getAttributeId(),
+                'options'     => $optionMap,
+            ];
+        }
+    } catch (\Exception $e) {
+        // non-configurable product — skip
+    }
+}
+
+// Custom option sync: dropdown/radio options matched by title in JS
+$_customOptions = [];
+try {
+    foreach (($_product->getOptions() ?: []) as $_opt) {
+        if (!in_array($_opt->getType(), ['drop_down', 'radio'])) continue;
+        $_vals = [];
+        foreach ((array)$_opt->getValues() as $_val) {
+            $_vals[] = ['label' => $_val->getTitle(), 'id' => (string)$_val->getOptionTypeId()];
+        }
+        if (!empty($_vals)) {
+            $_customOptions[] = [
+                'title'    => $_opt->getTitle(),
+                'optionId' => (string)$_opt->getOptionId(),
+                'values'   => $_vals,
+            ];
+        }
+    }
+} catch (\Exception $e) {
+    // skip
+}
+?>
+
+<?php if ($_product->isSaleable()) : ?>
+
+<?php if ($_isSlimUi) : ?>
+<!-- ── Printess Slim UI ──────────────────────────────────────────── -->
+<div class="printess-slim-wrapper" style="display:grid;grid-template-columns:2fr 380px;gap:20px;margin-bottom:20px;">
+    <div class="printess-preview-container" style="position:relative;overflow:hidden;">
+        <div class="printess-preview" style="margin-top:10px;max-height:70vh;background:#fff;display:flex;align-items:flex-start;justify-content:center;">
+            <img class="printess-preview-image"
+                 alt="<?= $block->escapeHtmlAttr(__('Product preview')) ?>"
+                 style="width:auto;height:auto;max-height:70vh;max-width:100%;opacity:1;transition:opacity .5s;border:1px solid #aaa;" />
+            <div class="printess-image-loader" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:68px;display:none;">
+                <svg class="circular" viewBox="25 25 50 50" style="animation:printess-loader-rotate 2s linear infinite;height:100%;width:100%;">
+                    <circle class="path" cx="50" cy="50" r="20" fill="none" stroke-width="5" stroke-miterlimit="10"
+                            style="stroke-dasharray:1,200;stroke-dashoffset:0;animation:printess-loader-dash 1.5s ease-in-out infinite,printess-loader-color 6s ease-in-out infinite;stroke-linecap:round;"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+    <div>
+        <div class="printess-ui" style="overflow:auto;"></div>
+        <div class="box-tocart" style="margin-top:10px;">
+            <div class="fieldset">
+                <?php if ($block->shouldRenderQuantity()) : ?>
+                <div class="field qty">
+                    <label class="label" for="qty"><span><?= $block->escapeHtml(__('Qty')) ?></span></label>
+                    <div class="control">
+                        <input type="number" name="qty" id="qty" min="1" value="<?= $block->getProductDefaultQty() * 1 ?>"
+                               title="<?= $block->escapeHtmlAttr(__('Qty')) ?>" class="input-text qty"
+                               data-validate="<?= $block->escapeHtml(json_encode($block->getQuantityValidators())) ?>"/>
+                    </div>
+                </div>
+                <?php endif; ?>
+                <div class="actions">
+                    <button type="button"
+                            id="product-addtocart-button"
+                            title="<?= $block->escapeHtmlAttr(__('Add to Basket')) ?>"
+                            class="action primary tocart">
+                        <span><?= $block->escapeHtml(__('Add to Basket')) ?></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+@keyframes printess-loader-rotate{100%{transform:rotate(360deg)}}
+@keyframes printess-loader-dash{0%{stroke-dasharray:1,200;stroke-dashoffset:0}50%{stroke-dasharray:89,200;stroke-dashoffset:-35}100%{stroke-dasharray:89,200;stroke-dashoffset:-124}}
+@keyframes printess-loader-color{100%,0%{stroke:#d62d20}40%{stroke:#0057e7}66%{stroke:#008744}80%,90%{stroke:#ffa700}}
+@media(max-width:900px){.printess-slim-wrapper{grid-template-columns:1fr!important}}
+</style>
+<script>
+require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessEditor) {
+    PrintessEditor.initSlimUi({
+        shopToken:           <?= /* @noEscape */ json_encode($_shopToken) ?>,
+        templateName:        <?= /* @noEscape */ json_encode($_template) ?>,
+        formId:              'product_addtocart_form',
+        variantOptions:      <?= /* @noEscape */ json_encode($_variantOptions) ?>,
+        customOptions:       <?= /* @noEscape */ json_encode($_customOptions) ?>,
+        pagePricing:         <?= /* @noEscape */ $_pagePricing ?>,
+        basePrice:           <?= /* @noEscape */ (float)$_basePrice ?>,
+        currencyCode:        <?= /* @noEscape */ json_encode($_currencyCode) ?>,
+        locale:              <?= /* @noEscape */ json_encode($_locale) ?>,
+        theme:               <?= /* @noEscape */ json_encode($_theme) ?>,
+        magicPhotobookTheme: <?= /* @noEscape */ json_encode($_magicPhotobookTheme) ?>,
+        printSettings:       <?= /* @noEscape */ json_encode($_printSettings) ?>,
+        mergeTemplate:       <?= /* @noEscape */ json_encode($_mergeTemplate) ?>
+    });
+    document.getElementById('product-addtocart-button').addEventListener('click', function () {
+        PrintessEditor.addToBasketFromSlim();
+    });
+});
+</script>
+
+<?php elseif ($_isPrintess) : ?>
+<!-- ── Printess Panel UI ─────────────────────────────────────────── -->
+<div class="box-tocart">
+    <div class="fieldset">
+        <?php if ($block->shouldRenderQuantity()) : ?>
+        <div class="field qty">
+            <label class="label" for="qty"><span><?= $block->escapeHtml(__('Qty')) ?></span></label>
+            <div class="control">
+                <input type="number" name="qty" id="qty" min="0"
+                       value="<?= $block->getProductDefaultQty() * 1 ?>"
+                       title="<?= $block->escapeHtmlAttr(__('Qty')) ?>"
+                       class="input-text qty"
+                       data-validate="<?= $block->escapeHtml(json_encode($block->getQuantityValidators())) ?>"/>
+            </div>
+        </div>
+        <?php endif; ?>
+        <div class="actions">
+            <button type="button"
+                    id="product-addtocart-button"
+                    title="<?= $block->escapeHtmlAttr(__('Customize')) ?>"
+                    class="action primary tocart">
+                <span><?= $block->escapeHtml(__('Customize')) ?></span>
+            </button>
+        </div>
+    </div>
+</div>
+<script>
+require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessEditor) {
+    document.getElementById('product-addtocart-button').addEventListener('click', function () {
+        PrintessEditor.openFromProduct({
+            shopToken:           <?= /* @noEscape */ json_encode($_shopToken) ?>,
+            templateName:        <?= /* @noEscape */ json_encode($_template) ?>,
+            formId:              'product_addtocart_form',
+            variantOptions:      <?= /* @noEscape */ json_encode($_variantOptions) ?>,
+        customOptions:       <?= /* @noEscape */ json_encode($_customOptions) ?>,
+            pagePricing:         <?= /* @noEscape */ $_pagePricing ?>,
+            basePrice:           <?= /* @noEscape */ (float)$_basePrice ?>,
+            currencyCode:        <?= /* @noEscape */ json_encode($_currencyCode) ?>,
+            locale:              <?= /* @noEscape */ json_encode($_locale) ?>,
+            theme:               <?= /* @noEscape */ json_encode($_theme) ?>,
+            magicPhotobookTheme: <?= /* @noEscape */ json_encode($_magicPhotobookTheme) ?>,
+            printSettings:       <?= /* @noEscape */ json_encode($_printSettings) ?>,
+            mergeTemplate:       <?= /* @noEscape */ json_encode($_mergeTemplate) ?>,
+            isLoggedIn:          <?= /* @noEscape */ $_isLoggedIn ? 'true' : 'false' ?>
+        });
+    });
+});
+</script>
+
+<?php else : ?>
+<!-- ── Standard Add to Cart ──────────────────────────────────────── -->
+<div class="box-tocart">
+    <div class="fieldset">
+        <?php if ($block->shouldRenderQuantity()) : ?>
+        <div class="field qty">
+            <label class="label" for="qty"><span><?= $block->escapeHtml(__('Qty')) ?></span></label>
+            <div class="control">
+                <input type="number" name="qty" id="qty" min="0"
+                       value="<?= $block->getProductDefaultQty() * 1 ?>"
+                       title="<?= $block->escapeHtmlAttr(__('Qty')) ?>"
+                       class="input-text qty"
+                       data-validate="<?= $block->escapeHtml(json_encode($block->getQuantityValidators())) ?>"/>
+            </div>
+        </div>
+        <?php endif; ?>
+        <div class="actions">
+            <button type="submit"
+                    title="<?= $block->escapeHtmlAttr(__('Add to Cart')) ?>"
+                    class="action primary tocart"
+                    id="product-addtocart-button"
+                    disabled>
+                <span><?= $block->escapeHtml(__('Add to Cart')) ?></span>
+            </button>
+            <?= $block->getChildHtml('', true) ?>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php endif; ?>
+
+<script type="text/x-magento-init">
+    {
+        "#product_addtocart_form": {
+            "Magento_Catalog/js/validate-product": {}
+        }
+    }
+</script>

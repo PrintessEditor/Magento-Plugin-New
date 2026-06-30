@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <virtualType name="Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\Pool">
+        <arguments>
+            <argument name="modifiers" xsi:type="array">
+                <item name="printess_theme_modifier" xsi:type="array">
+                    <item name="class" xsi:type="string">Printess\PrintessEditor\Ui\DataProvider\Product\Form\Modifier\PrintessThemeModifier</item>
+                    <item name="sortOrder" xsi:type="number">200</item>
+                </item>
+                <item name="printess_pricing_modifier" xsi:type="array">
+                    <item name="class" xsi:type="string">Printess\PrintessEditor\Ui\DataProvider\Product\Form\Modifier\PrintessPricingModifier</item>
+                    <item name="sortOrder" xsi:type="number">210</item>
+                </item>
+            </argument>
+        </arguments>
+    </virtualType>
+</config>

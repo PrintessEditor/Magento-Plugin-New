@@ -1,0 +1,27 @@
+{
+    "name": "printess/magento2-printess-editor",
+    "description": "Printess Editor integration for Magento 2 / Mage-OS",
+    "type": "magento2-module",
+    "version": "1.0.0",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.1",
+        "magento/framework": "^103.0",
+        "magento/module-catalog": "^103.0",
+        "magento/module-checkout": "^100.4",
+        "magento/module-configurable-product": "^100.4",
+        "magento/module-csp": "^100.4",
+        "magento/module-customer": "^103.0",
+        "magento/module-eav": "^102.0",
+        "magento/module-quote": "^101.2",
+        "magento/module-sales": "^103.0"
+    },
+    "autoload": {
+        "files": [
+            "registration.php"
+        ],
+        "psr-4": {
+            "Printess\\PrintessEditor\\": ""
+        }
+    }
+}

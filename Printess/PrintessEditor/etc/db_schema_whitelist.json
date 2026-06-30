@@ -1,0 +1,17 @@
+{
+    "printess_saved_projects": {
+        "column": {
+            "id": true,
+            "customer_id": true,
+            "name": true,
+            "save_token": true,
+            "created_at": true
+        },
+        "index": {
+            "PRINTESS_SAVED_PROJECTS_CUSTOMER_ID": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
+    }
+}
