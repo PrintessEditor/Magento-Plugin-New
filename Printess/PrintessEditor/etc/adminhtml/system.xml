@@ -4,11 +4,11 @@
         <tab id="printess" translate="label" sortOrder="500">
             <label>Printess</label>
         </tab>
-        <section id="printess_editor" translate="label" type="text" sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="1">
+        <section id="designer" translate="label" type="text" sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="1">
             <label>Printess Editor</label>
             <tab>printess</tab>
             <resource>Printess_PrintessEditor::config</resource>
-            <group id="api" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+            <group id="api_token" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>API Settings</label>
                 <field id="shop_token" translate="label" type="obscure" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Shop Token (Frontend)</label>

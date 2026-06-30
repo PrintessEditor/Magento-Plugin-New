@@ -8,10 +8,10 @@ use Magento\Store\Model\ScopeInterface;
 
 class Config extends AbstractHelper
 {
-    public const XML_PATH_SHOP_TOKEN     = 'printess_editor/api/shop_token';
-    public const XML_PATH_SERVICE_TOKEN  = 'printess_editor/api/service_token';
-    public const XML_PATH_EDITOR_THEME   = 'printess_editor/editor/theme';
-    public const XML_PATH_PRINT_SETTINGS = 'printess_editor/production/print_settings';
+    public const XML_PATH_SHOP_TOKEN     = 'designer/api_token/shop_token';
+    public const XML_PATH_SERVICE_TOKEN  = 'designer/api_token/service_token';
+    public const XML_PATH_EDITOR_THEME   = 'designer/editor/theme';
+    public const XML_PATH_PRINT_SETTINGS = 'designer/production/print_settings';
 
     private EncryptorInterface $encryptor;
 
