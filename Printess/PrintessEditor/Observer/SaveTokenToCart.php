@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Printess\PrintessEditor\Observer;
 
 use Magento\Framework\Event\Observer;

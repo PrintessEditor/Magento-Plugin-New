@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Email:etc/email_templates.xsd">
+    <template id="printess_designer_projects_order_reminder_template"
+              label="Printess Project - Remind to Order"
+              file="printess_project_remind_to_order.html" type="html"
+              module="Printess_PrintessEditor" area="frontend"/>
+    <template id="printess_designer_projects_removal_reminder_template"
+              label="Printess Project - Removal Reminder"
+              file="printess_project_remind_of_removal.html" type="html"
+              module="Printess_PrintessEditor" area="frontend"/>
+</config>

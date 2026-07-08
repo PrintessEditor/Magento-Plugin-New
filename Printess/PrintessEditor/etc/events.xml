@@ -8,5 +8,7 @@
     </event>
     <event name="sales_order_place_after">
         <observer name="printess_produce_pdf" instance="Printess\PrintessEditor\Observer\ProducePdf"/>
+        <observer name="printess_mark_saved_project_ordered"
+                  instance="Printess\PrintessEditor\Observer\MarkSavedProjectOrdered"/>
     </event>
 </config>

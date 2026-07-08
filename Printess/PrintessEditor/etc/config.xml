@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <printess_designer>
+            <projects>
+                <enabled>0</enabled>
+                <retention_days>30</retention_days>
+                <order_reminder_after_days>5</order_reminder_after_days>
+                <removal_reminder_before_days>5</removal_reminder_before_days>
+                <email_batch_limit>100</email_batch_limit>
+                <order_reminder_template>printess_designer_projects_order_reminder_template</order_reminder_template>
+                <removal_reminder_template>printess_designer_projects_removal_reminder_template</removal_reminder_template>
+            </projects>
+            <cron>
+                <send_project_reminders>30 8 * * *</send_project_reminders>
+                <remove_expired_projects>30 2 * * *</remove_expired_projects>
+            </cron>
+        </printess_designer>
+    </default>
+</config>

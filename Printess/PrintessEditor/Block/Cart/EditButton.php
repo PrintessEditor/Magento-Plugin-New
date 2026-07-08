@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Printess\PrintessEditor\Block\Cart;
 
 use Printess\PrintessEditor\Helper\Config;

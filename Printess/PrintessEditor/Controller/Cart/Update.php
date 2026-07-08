@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Printess\PrintessEditor\Controller\Cart;
 
 use Magento\Framework\App\Action\HttpPostActionInterface;

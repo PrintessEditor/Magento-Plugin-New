@@ -1,0 +1,93 @@
+<?php
+/**
+ * @var \Printess\PrintessEditor\Block\Projects $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+$projects = $block->getProjects();
+?>
+<?php if ($projects->getSize()) : ?>
+    <div class="printess-projects" data-role="printess-projects">
+        <?php foreach ($projects as $project) : ?>
+            <article class="printess-project">
+                <?php if ($project->getData('thumbnail_url')) : ?>
+                    <div class="printess-project-image">
+                        <img src="<?= $escaper->escapeUrl($project->getData('thumbnail_url')) ?>"
+                             alt="<?= $escaper->escapeHtmlAttr($project->getData('name')) ?>"/>
+                    </div>
+                <?php endif; ?>
+                <div class="printess-project-details">
+                    <p class="printess-project-title">
+                        <strong><?= $escaper->escapeHtml($project->getData('name')) ?></strong>
+                        <a href="#" class="printess-project-rename-toggle"><?= $escaper->escapeHtml(__('rename')) ?></a>
+                    </p>
+                    <form class="printess-project-rename" method="post" style="display:none;"
+                          action="<?= $escaper->escapeUrl($block->getRenameUrl()) ?>">
+                        <?= $block->getBlockHtml('formkey') ?>
+                        <input type="hidden" name="project_id" value="<?= (int) $project->getId() ?>"/>
+                        <input class="input-text" type="text" name="name" maxlength="255" required
+                               value="<?= $escaper->escapeHtmlAttr($project->getData('name')) ?>"/>
+                        <button class="action secondary" type="submit">
+                            <span><?= $escaper->escapeHtml(__('Save')) ?></span>
+                        </button>
+                        <button class="action printess-project-rename-cancel" type="button">
+                            <span><?= $escaper->escapeHtml(__('Cancel')) ?></span>
+                        </button>
+                    </form>
+                    <?php if ($project->getData('product_name')) : ?>
+                        <p><?= $escaper->escapeHtml($project->getData('product_name')) ?></p>
+                    <?php endif; ?>
+                    <p>
+                        <?= $escaper->escapeHtml(__('Last edited: %1', $block->formatDate($project->getData('updated_at')))) ?>
+                    </p>
+                    <?php if ($project->getData('expires_at')) : ?>
+                        <p class="printess-project-expiry<?= $block->isExpired($project) ? ' expired' : '' ?>">
+                            <?= $escaper->escapeHtml(
+                                $block->isExpired($project)
+                                    ? __('Expired: %1', $block->formatDate($project->getData('expires_at')))
+                                    : __('Expires: %1', $block->formatDate($project->getData('expires_at')))
+                            ) ?>
+                        </p>
+                    <?php endif; ?>
+
+                    <div class="printess-project-actions">
+                        <?php if (!$block->isExpired($project) && $project->getData('product_id')) : ?>
+                            <div class="primary">
+                                <button class="action primary printess-project-continue"
+                                        type="button"
+                                        data-project-id="<?= (int) $project->getId() ?>">
+                                    <span><?= $escaper->escapeHtml(__('Continue Editing')) ?></span>
+                                </button>
+                            </div>
+                        <?php endif; ?>
+
+                        <form class="printess-project-delete" method="post"
+                              action="<?= $escaper->escapeUrl($block->getDeleteUrl()) ?>"
+                              data-confirm-message="<?= $escaper->escapeHtmlAttr(
+                                  __('Are you sure you want to delete this project?')
+                              ) ?>">
+                            <?= $block->getBlockHtml('formkey') ?>
+                            <input type="hidden" name="project_id" value="<?= (int) $project->getId() ?>"/>
+                            <button class="action delete" type="submit">
+                                <span><?= $escaper->escapeHtml(__('Delete')) ?></span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </article>
+        <?php endforeach; ?>
+    </div>
+    <?= $block->getPagerHtml() ?>
+    <script type="text/x-magento-init">
+        {
+            "[data-role=printess-projects]": {
+                "Printess_PrintessEditor/js/projects": {
+                    "openUrl": <?= /* @noEscape */ json_encode($block->getOpenUrl()) ?>
+                }
+            }
+        }
+    </script>
+<?php else : ?>
+    <div class="message info empty">
+        <span><?= $escaper->escapeHtml(__('You have no saved projects.')) ?></span>
+    </div>
+<?php endif; ?>

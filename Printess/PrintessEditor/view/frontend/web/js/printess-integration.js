@@ -15,24 +15,30 @@ define(['jquery'], function ($) {
     var _panelHistoryPushed = false;  // true while editor history state is on the stack
     var _currentPageCount = 0;      // last page count reported by priceChangeCallback
     var _currentFormFields = {};     // live snapshot of Printess form field values
+    var _minPages = 0;               // template's minimum page count (minSpreads * 2); pages at or below this are not billed
 
     // Close the panel editor programmatically (called by back-button handler).
+    // Prefers hide() so the instance stays in the DOM and can be shown again cheaply.
+    // Only clears _panelEditorRef when hide is unavailable and we must remove the DOM node.
     function closePanelEditor() {
         _panelHistoryPushed = false;
-        var ref = _panelEditorRef;
-        _panelEditorRef = null;
-        if (!ref) return;
+        if (!_panelEditorRef) return;
         try {
-            if (typeof ref.close === 'function') { ref.close(); return; }
-            if (typeof ref.hide === 'function') { ref.hide(); return; }
-            if (ref.ui && typeof ref.ui.close === 'function') { ref.ui.close(); return; }
-            if (ref.ui && typeof ref.ui.hide === 'function') { ref.ui.hide(); return; }
+            if (_panelEditorRef.ui && typeof _panelEditorRef.ui.hide === 'function') {
+                _panelEditorRef.ui.hide();
+                return;
+            }
+            if (typeof _panelEditorRef.hide === 'function') {
+                _panelEditorRef.hide();
+                return;
+            }
         } catch (e) { }
-        // Fallback: remove any fixed full-viewport Printess overlay from the DOM.
+        // hide not available — fall back to DOM removal and clear the ref
         document.querySelectorAll('[id*="printess"],[class*="printess"]').forEach(function (el) {
             var s = window.getComputedStyle(el);
             if (s.position === 'fixed' && parseInt(s.zIndex, 10) > 999) { el.remove(); }
         });
+        _panelEditorRef = null;
     }
 
     // Intercept the browser back button while the panel editor is open.
@@ -169,7 +175,7 @@ define(['jquery'], function ($) {
                 }
             }
         });
-        console.warn('[Printess] seeding formFields', fields);
+        // console.warn('[Printess] seeding formFields', fields);
         return fields;
     }
 
@@ -206,150 +212,20 @@ define(['jquery'], function ($) {
         }
     }
 
-    // --- saved projects helpers ---
+    async function fetchMinPages(module, templateName, shopToken) {
+        try {
+            if (typeof module.getDocInfoForPhotobook === 'function') {
+                var info = await module.getDocInfoForPhotobook(templateName, shopToken);
+                return ((info && info.minSpreads) || 0) * 2 - 2;
+            }
+        } catch (e) { }
+        return 0;
+    }
 
-    var SAVE_URL = '/printess/project/save';
-    var LIST_URL = '/printess/project/list';
+    // --- saved projects helpers ---
 
     function esc(str) {
         return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    function buildModalOverlay() {
-        var overlay = document.createElement('div');
-        overlay.style.cssText = [
-            'position:fixed', 'top:0', 'left:0', 'width:100%', 'height:100%',
-            'background:rgba(0,0,0,.55)', 'z-index:100000',
-            'display:flex', 'align-items:center', 'justify-content:center'
-        ].join(';');
-        return overlay;
-    }
-
-    function buildModal(titleText, bodyHtml, footerHtml) {
-        var box = document.createElement('div');
-        box.style.cssText = [
-            'background:#fff', 'border-radius:6px', 'padding:28px 32px',
-            'min-width:360px', 'max-width:560px', 'width:90vw',
-            'max-height:80vh', 'display:flex', 'flex-direction:column', 'gap:16px'
-        ].join(';');
-        box.innerHTML = '<h3 style="margin:0;font-size:18px;font-weight:600;">' + esc(titleText) + '</h3>'
-            + '<div class="pm-body" style="overflow-y:auto;flex:1;">' + bodyHtml + '</div>'
-            + '<div class="pm-footer" style="display:flex;gap:8px;justify-content:flex-end;">' + footerHtml + '</div>';
-        return box;
-    }
-
-    function btn(label, primary) {
-        var s = 'padding:8px 18px;border-radius:4px;border:1px solid #ccc;cursor:pointer;font-size:14px;';
-        if (primary) s += 'background:#1979c3;color:#fff;border-color:#1979c3;';
-        else s += 'background:#fff;color:#333;';
-        return '<button style="' + s + '">' + esc(label) + '</button>';
-    }
-
-    function buildSaveCallback() {
-        return function (saveToken) {
-            return new Promise(function (resolve, reject) {
-                var overlay = buildModalOverlay();
-                var modal = buildModal(
-                    'Save Project',
-                    '<label style="display:block;margin-bottom:6px;font-size:14px;">Project name</label>'
-                    + '<input id="pm-name" type="text" placeholder="My Project" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:14px;" />',
-                    btn('Cancel') + btn('Save', true)
-                );
-                overlay.appendChild(modal);
-                document.body.appendChild(overlay);
-
-                var input = modal.querySelector('#pm-name');
-                var buttons = modal.querySelectorAll('button');
-                input.focus();
-
-                function close() { overlay.remove(); }
-
-                buttons[0].addEventListener('click', function () { close(); reject(new Error('cancelled')); });
-                buttons[1].addEventListener('click', function () {
-                    var name = input.value.trim() || 'My Project';
-                    close();
-                    fetch(SAVE_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'same-origin',
-                        body: JSON.stringify({ name: name, saveToken: saveToken })
-                    })
-                        .then(function (r) {
-                            if (r.status === 401) {
-                                alert('Please log in to save your project.');
-                                reject(new Error('not logged in'));
-                                return null;
-                            }
-                            return r.json();
-                        })
-                        .then(function (d) {
-                            if (!d) return;
-                            d.success ? resolve() : reject(new Error(d.message || 'Save failed'));
-                        })
-                        .catch(reject);
-                });
-                input.addEventListener('keydown', function (e) {
-                    if (e.key === 'Enter') buttons[1].click();
-                    if (e.key === 'Escape') buttons[0].click();
-                });
-            });
-        };
-    }
-
-    function buildLoadCallback() {
-        return function () {
-            return new Promise(function (resolve, reject) {
-                fetch(LIST_URL, { credentials: 'same-origin' })
-                    .then(function (r) {
-                        if (r.status === 401) {
-                            alert('Please log in to load a saved project.');
-                            reject(new Error('not logged in'));
-                            return null;
-                        }
-                        return r.json();
-                    })
-                    .then(function (projects) {
-                        if (!projects) return;
-                        var overlay = buildModalOverlay();
-                        var listHtml;
-                        if (!projects.length) {
-                            listHtml = '<p style="color:#888;margin:0;">No saved projects yet.</p>';
-                        } else {
-                            listHtml = '<ul style="list-style:none;margin:0;padding:0;">';
-                            projects.forEach(function (p, i) {
-                                var date = p.created_at ? p.created_at.replace('T', ' ').slice(0, 16) : '';
-                                listHtml += '<li data-index="' + i + '" style="'
-                                    + 'padding:10px 12px;cursor:pointer;border-radius:4px;'
-                                    + 'display:flex;justify-content:space-between;align-items:center;'
-                                    + 'border-bottom:1px solid #f0f0f0;">'
-                                    + '<span style="font-weight:500;">' + esc(p.name) + '</span>'
-                                    + '<span style="font-size:12px;color:#888;white-space:nowrap;margin-left:12px;">' + esc(date) + '</span>'
-                                    + '</li>';
-                            });
-                            listHtml += '</ul>';
-                        }
-                        var modal = buildModal('My Saved Projects', listHtml, btn('Cancel'));
-                        overlay.appendChild(modal);
-                        document.body.appendChild(overlay);
-
-                        function close() { overlay.remove(); }
-
-                        modal.querySelectorAll('li[data-index]').forEach(function (li) {
-                            li.addEventListener('mouseenter', function () { li.style.background = '#f5f5f5'; });
-                            li.addEventListener('mouseleave', function () { li.style.background = ''; });
-                            li.addEventListener('click', function () {
-                                close();
-                                resolve(projects[parseInt(li.dataset.index, 10)].save_token);
-                            });
-                        });
-                        modal.querySelector('button').addEventListener('click', function () {
-                            close();
-                            reject(new Error('cancelled'));
-                        });
-                    })
-                    .catch(reject);
-            });
-        };
     }
 
     // --- pricing helpers ---
@@ -401,14 +277,35 @@ define(['jquery'], function ($) {
     }
 
     function computePrice(basePrice, pagePricing, pageCount, formFields) {
-        return basePrice + pageCount * resolvePricePerPage(pagePricing, formFields);
+        var billablePages = Math.max(0, pageCount - _minPages);
+        return basePrice + billablePages * resolvePricePerPage(pagePricing, formFields);
+    }
+
+    // Read the current Magento final price from the product page price box.
+    // Magento's price-box widget updates data-price-amount synchronously when a
+    // custom option or configurable attribute change event fires.
+    function readMagentoFinalPrice(fallback) {
+        var el = document.querySelector('.product-info-main [data-price-type="finalPrice"], [data-role="priceBox"] [data-price-type="finalPrice"]');
+        if (el) {
+            var amount = parseFloat(el.getAttribute('data-price-amount'));
+            if (!isNaN(amount) && amount > 0) return amount;
+        }
+        return fallback;
     }
 
     function makePriceChangeCallback(basePrice, pagePricing, currencyCode, locale, getPanelRef) {
         return function (data) {
             var pageCount = typeof data === 'number' ? data : (data.pageCount || data.pages || 0);
             _currentPageCount = pageCount;
-            var newPrice = computePrice(basePrice, pagePricing, pageCount, _currentFormFields);
+
+            if (data && typeof data === 'object' && data.priceRelevantFormFields) {
+                Object.keys(data.priceRelevantFormFields).forEach(function (k) {
+                    _currentFormFields[k] = data.priceRelevantFormFields[k].value;
+                });
+            }
+
+            var currentBase = readMagentoFinalPrice(basePrice);
+            var newPrice = computePrice(currentBase, pagePricing, pageCount, _currentFormFields);
             var ref = getPanelRef();
             if (ref && ref.ui && ref.ui.refreshPriceDisplay) {
                 ref.ui.refreshPriceDisplay({ price: formatPrice(newPrice, currencyCode, locale) });
@@ -417,8 +314,27 @@ define(['jquery'], function ($) {
     }
 
     async function openPanelEditor(opts) {
+        // If a hidden instance already exists, show it rather than loading a second one.
+        if (_panelEditorRef) {
+            try {
+                if (_panelEditorRef.ui && typeof _panelEditorRef.ui.show === 'function') {
+                    if (!_panelHistoryPushed) { _panelHistoryPushed = true; history.pushState({ printessEditor: true }, ''); }
+                    _panelEditorRef.ui.show();
+                    return;
+                }
+                if (typeof _panelEditorRef.show === 'function') {
+                    if (!_panelHistoryPushed) { _panelHistoryPushed = true; history.pushState({ printessEditor: true }, ''); }
+                    _panelEditorRef.show();
+                    return;
+                }
+            } catch (e) { }
+            // show not available — clear the stale ref and fall through to a fresh load
+            _panelEditorRef = null;
+        }
+
         _currentPageCount = 0;
         _currentFormFields = {};
+        _minPages = 0;
 
         // Seed form fields from the initial values passed to Printess so the first
         // priceChangeCallback fires with the correct field state.
@@ -435,6 +351,7 @@ define(['jquery'], function ($) {
         }
 
         var loaderModule = await getPanelLoader();
+        _minPages = await fetchMinPages(loaderModule, opts.templateName, opts.shopToken);
         var panelRef = null;
         var loadCfg = {
             token: opts.shopToken,
@@ -448,7 +365,7 @@ define(['jquery'], function ($) {
         }
 
         var variantOptions = opts.variantOptions || [];
-        var customOptions  = opts.customOptions  || [];
+        var customOptions = opts.customOptions || [];
         var fieldHandlers = [];
         if (variantOptions.length || customOptions.length) {
             fieldHandlers.push(function (fieldName, value, _tag, fieldLabel) {
@@ -464,7 +381,8 @@ define(['jquery'], function ($) {
         if (pagePricing.length) {
             fieldHandlers.push(function (fieldName, value) {
                 _currentFormFields[fieldName] = value;
-                var newPrice = computePrice(opts.basePrice || 0, pagePricing, _currentPageCount, _currentFormFields);
+                var currentBase = readMagentoFinalPrice(opts.basePrice || 0);
+                var newPrice = computePrice(currentBase, pagePricing, _currentPageCount, _currentFormFields);
                 if (panelRef && panelRef.ui && panelRef.ui.refreshPriceDisplay) {
                     panelRef.ui.refreshPriceDisplay({ price: formatPrice(newPrice, opts.currencyCode, opts.locale) });
                 }
@@ -472,9 +390,6 @@ define(['jquery'], function ($) {
         }
         loadCfg.formFieldChangedCallback = function (name, value, tag, label) {
             _currentFormFields[name] = value;
-            var matchedAttr = findMatchingVariantAttr(variantOptions, name, label);
-            var matchedOpt  = matchedAttr ? null : findMatchingCustomOption(customOptions, name);
-            console.warn('[Printess] fieldChanged', { fieldName: name, value: value, variantMatch: matchedAttr ? matchedAttr.label : null, customOptionMatch: matchedOpt ? matchedOpt.title : null, customOptionsAvailable: customOptions.length });
             fieldHandlers.forEach(function (h) { h(name, value, tag, label); });
         };
 
@@ -496,9 +411,16 @@ define(['jquery'], function ($) {
                 function () { return panelRef; }
             );
         }
-        console.warn('[Printess] calling load() with loadCfg keys:', Object.keys(loadCfg), '| pagePricing:', pagePricing);
+        // console.warn('[Printess] calling load() with loadCfg keys:', Object.keys(loadCfg), '| pagePricing:', pagePricing);
         panelRef = await loaderModule.load(loadCfg);
         _panelEditorRef = panelRef;
+
+        // Trigger an immediate price update so the display reflects the load params
+        // (formFields are already seeded; page count will be 0 until priceChangeCallback fires).
+        if (pagePricing.length && panelRef && panelRef.ui && panelRef.ui.refreshPriceDisplay) {
+            var initialPrice = computePrice(opts.basePrice || 0, pagePricing, _currentPageCount, _currentFormFields);
+            panelRef.ui.refreshPriceDisplay({ price: formatPrice(initialPrice, opts.currencyCode, opts.locale) });
+        }
     }
 
     function setOrAddHidden(form, name, value) {
@@ -542,14 +464,14 @@ define(['jquery'], function ($) {
          */
         openFromProduct: function (cfg) {
             var variantOptions = cfg.variantOptions || [];
-            var customOptions  = cfg.customOptions  || [];
-            console.warn('[Printess] openFromProduct', { variantOptions: variantOptions, customOptions: customOptions });
+            var customOptions = cfg.customOptions || [];
+            // console.warn('[Printess] openFromProduct', { variantOptions: variantOptions, customOptions: customOptions });
             var panelCfg = {
                 shopToken: cfg.shopToken,
                 templateName: cfg.templateName,
                 formFields: buildAutoFormFields(variantOptions, customOptions),
                 variantOptions: variantOptions,
-                customOptions:  customOptions,
+                customOptions: customOptions,
                 theme: cfg.theme,
                 magicPhotobookTheme: cfg.magicPhotobookTheme,
                 printSettings: cfg.printSettings,
@@ -558,17 +480,19 @@ define(['jquery'], function ($) {
                 currencyCode: cfg.currencyCode,
                 locale: cfg.locale,
                 basePrice: cfg.basePrice,
-                onAddToBasket: function (saveToken, thumbnailUrl) {
+                onAddToBasket: async function (saveToken, thumbnailUrl) {
                     var form = document.getElementById(cfg.formId || 'product_addtocart_form');
                     if (!form) {
                         console.error('Printess: add-to-cart form not found');
-                        return Promise.reject(new Error('form not found'));
+                        throw new Error('form not found');
+                    }
+                    if (cfg.onAddToBasket) {
+                        try { await cfg.onAddToBasket(saveToken, thumbnailUrl); } catch (e) {}
                     }
                     return postFormToCart(form, saveToken, thumbnailUrl);
                 }
             };
-            panelCfg.saveTemplateCallback = buildSaveCallback();
-            panelCfg.loadTemplateButtonCallback = buildLoadCallback();
+            panelCfg.saveTemplateCallback = cfg.saveTemplateCallback || buildSaveCallback();
             openPanelEditor(panelCfg);
         },
 
@@ -581,7 +505,7 @@ define(['jquery'], function ($) {
             _slimFormId = cfg.formId || 'product_addtocart_form';
             _currentPageCount = 0;
             var variantOptions = cfg.variantOptions || [];
-            var customOptions  = cfg.customOptions  || [];
+            var customOptions = cfg.customOptions || [];
 
             import(SLIM_LOADER_URL).then(function (slimModule) {
                 var slimCfg = {

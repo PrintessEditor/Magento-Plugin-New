@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Printess\PrintessEditor\Helper;
 
 use Magento\Framework\App\Helper\AbstractHelper;
@@ -8,10 +11,10 @@ use Magento\Store\Model\ScopeInterface;
 
 class Config extends AbstractHelper
 {
-    public const XML_PATH_SHOP_TOKEN     = 'designer/api_token/shop_token';
-    public const XML_PATH_SERVICE_TOKEN  = 'designer/api_token/service_token';
-    public const XML_PATH_EDITOR_THEME   = 'designer/editor/theme';
-    public const XML_PATH_PRINT_SETTINGS = 'designer/production/print_settings';
+    public const XML_PATH_SHOP_TOKEN     = 'printess_designer/api_token/shop_token';
+    public const XML_PATH_SERVICE_TOKEN  = 'printess_designer/api_token/service_token';
+    public const XML_PATH_EDITOR_THEME   = 'printess_designer/editor/theme';
+    public const XML_PATH_PRINT_SETTINGS = 'printess_designer/production/print_settings';
 
     private EncryptorInterface $encryptor;
 

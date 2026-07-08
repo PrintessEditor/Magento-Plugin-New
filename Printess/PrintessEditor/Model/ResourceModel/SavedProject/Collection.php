@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Printess\PrintessEditor\Model\ResourceModel\SavedProject;
 
 use Magento\Framework\Model\ResourceModel\Db\Collection\AbstractCollection;

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Printess\PrintessEditor\Setup\Patch\Data;
 
 use Magento\Catalog\Model\Product;
@@ -22,6 +25,10 @@ class AddProductAttributes implements DataPatchInterface
     {
         /** @var EavSetup $eavSetup */
         $eavSetup = $this->eavSetupFactory->create(['setup' => $this->setup]);
+
+        if ($eavSetup->getAttributeId(Product::ENTITY, 'printess_template')) {
+            return $this;
+        }
 
         $eavSetup->addAttribute(Product::ENTITY, 'printess_template', [
             'type'                    => 'varchar',

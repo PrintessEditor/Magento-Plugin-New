@@ -5,15 +5,15 @@
 $_product      = $block->getProduct();
 $_config       = $this->helper(\Printess\PrintessEditor\Helper\Config::class);
 $_printessData = $block->getData('printessData');
-$_isLoggedIn   = $_printessData->isLoggedIn();
+$_locale       = $_printessData->getLocale();
 $_store        = $block->getProduct()->getStore();
 $_currencyCode = $_store->getCurrentCurrencyCode();
-$_locale       = $_printessData->getLocale();
 $_template       = (string)($_product->getData('printess_template') ?? '');
 $_mergeTemplate  = (string)($_product->getData('printess_merge_template') ?? '');
 $_shopToken = $_config->getShopToken();
 $_isSlimUi  = $_template !== '' && $_shopToken !== '' && (bool)$_product->getData('printess_slim_ui');
 $_isPrintess = $_template !== '' && $_shopToken !== '' && !$_isSlimUi;
+$_buttonLabel = trim((string)($_product->getData('printess_product_btn_label') ?? '')) ?: (string)__('Personalise');
 
 // Editor theme: product-level overrides shop-level
 $_productTheme = (string)($_product->getData('printess_theme') ?? '');
@@ -158,11 +158,11 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
 <div class="box-tocart">
     <div class="fieldset">
         <?php if ($block->shouldRenderQuantity()) : ?>
-        <div class="field qty">
+        <!-- Qty hidden for Printess products: customer adjusts quantity in cart -->
+        <div class="field qty" style="display:none;">
             <label class="label" for="qty"><span><?= $block->escapeHtml(__('Qty')) ?></span></label>
             <div class="control">
-                <input type="number" name="qty" id="qty" min="0"
-                       value="<?= $block->getProductDefaultQty() * 1 ?>"
+                <input type="number" name="qty" id="qty" min="1" value="1"
                        title="<?= $block->escapeHtmlAttr(__('Qty')) ?>"
                        class="input-text qty"
                        data-validate="<?= $block->escapeHtml(json_encode($block->getQuantityValidators())) ?>"/>
@@ -172,34 +172,36 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
         <div class="actions">
             <button type="button"
                     id="product-addtocart-button"
-                    title="<?= $block->escapeHtmlAttr(__('Customize')) ?>"
-                    class="action primary tocart">
-                <span><?= $block->escapeHtml(__('Customize')) ?></span>
+                    title="<?= $block->escapeHtmlAttr($_buttonLabel) ?>"
+                    class="action primary tocart printess-design-action">
+                <span><?= $block->escapeHtml($_buttonLabel) ?></span>
             </button>
         </div>
     </div>
 </div>
-<script>
-require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessEditor) {
-    document.getElementById('product-addtocart-button').addEventListener('click', function () {
-        PrintessEditor.openFromProduct({
-            shopToken:           <?= /* @noEscape */ json_encode($_shopToken) ?>,
-            templateName:        <?= /* @noEscape */ json_encode($_template) ?>,
-            formId:              'product_addtocart_form',
-            variantOptions:      <?= /* @noEscape */ json_encode($_variantOptions) ?>,
-        customOptions:       <?= /* @noEscape */ json_encode($_customOptions) ?>,
-            pagePricing:         <?= /* @noEscape */ $_pagePricing ?>,
-            basePrice:           <?= /* @noEscape */ (float)$_basePrice ?>,
-            currencyCode:        <?= /* @noEscape */ json_encode($_currencyCode) ?>,
-            locale:              <?= /* @noEscape */ json_encode($_locale) ?>,
-            theme:               <?= /* @noEscape */ json_encode($_theme) ?>,
-            magicPhotobookTheme: <?= /* @noEscape */ json_encode($_magicPhotobookTheme) ?>,
-            printSettings:       <?= /* @noEscape */ json_encode($_printSettings) ?>,
-            mergeTemplate:       <?= /* @noEscape */ json_encode($_mergeTemplate) ?>,
-            isLoggedIn:          <?= /* @noEscape */ $_isLoggedIn ? 'true' : 'false' ?>
-        });
-    });
-});
+<script type="text/x-magento-init">
+{
+    ".printess-design-action": {
+        "Printess_PrintessEditor/js/printess-login-gate": {
+            "productId": <?= /* @noEscape */ json_encode((string)$_product->getId()) ?>,
+            "saveUrl": <?= /* @noEscape */ json_encode($block->getUrl('printess/project/save')) ?>,
+            "projectsUrl": <?= /* @noEscape */ json_encode($block->getUrl('printess/project/index')) ?>,
+            "shopToken": <?= /* @noEscape */ json_encode($_shopToken) ?>,
+            "templateName": <?= /* @noEscape */ json_encode($_template) ?>,
+            "formId": "product_addtocart_form",
+            "locale": <?= /* @noEscape */ json_encode($_locale) ?>,
+            "variantOptions": <?= /* @noEscape */ json_encode($_variantOptions) ?>,
+            "customOptions": <?= /* @noEscape */ json_encode($_customOptions) ?>,
+            "pagePricing": <?= /* @noEscape */ $_pagePricing ?>,
+            "basePrice": <?= /* @noEscape */ (float)$_basePrice ?>,
+            "currencyCode": <?= /* @noEscape */ json_encode($_currencyCode) ?>,
+            "theme": <?= /* @noEscape */ json_encode($_theme) ?>,
+            "magicPhotobookTheme": <?= /* @noEscape */ json_encode($_magicPhotobookTheme) ?>,
+            "printSettings": <?= /* @noEscape */ json_encode($_printSettings) ?>,
+            "mergeTemplate": <?= /* @noEscape */ json_encode($_mergeTemplate) ?>
+        }
+    }
+}
 </script>
 
 <?php else : ?>

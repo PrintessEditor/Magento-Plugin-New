@@ -1,0 +1,17 @@
+<!--@subject Your {{var store_name}} project is ready to finish @-->
+<!--@vars {
+"var customer_name":"Customer first name",
+"var project_name":"Project name",
+"var product_name":"Product name",
+"var expiry_date":"Project expiry date",
+"var projects_url":"My Projects URL",
+"var store_name":"Store name"
+} @-->
+{{template config_path="design/email/header_template"}}
+
+<p>{{trans "Hello %customer_name," customer_name=$customer_name}}</p>
+<p>{{trans "Your saved project %project_name for %product_name is waiting for you." project_name=$project_name product_name=$product_name}}</p>
+<p>{{trans "Complete and order it before %expiry_date. Open and save the project to extend its expiry." expiry_date=$expiry_date}}</p>
+<p><a href="{{var projects_url}}">{{trans "View My Projects"}}</a></p>
+
+{{template config_path="design/email/footer_template"}}

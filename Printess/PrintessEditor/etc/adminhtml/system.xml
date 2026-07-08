@@ -4,7 +4,7 @@
         <tab id="printess" translate="label" sortOrder="500">
             <label>Printess</label>
         </tab>
-        <section id="designer" translate="label" type="text" sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="1">
+        <section id="printess_designer" translate="label" type="text" sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="1">
             <label>Printess Editor</label>
             <tab>printess</tab>
             <resource>Printess_PrintessEditor::config</resource>
@@ -35,6 +35,58 @@
                     <label>Print Settings</label>
                     <source_model>Printess\PrintessEditor\Model\Config\Source\PrintSettings</source_model>
                     <comment>Select the named print settings to use when producing PDFs. Options are loaded from your Printess account.</comment>
+                </field>
+            </group>
+            <group id="projects" translate="label" type="text" sortOrder="40"
+                   showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Saved Projects and Notifications</label>
+                <field id="enabled" translate="label" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enabled</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Enable expiry reminders and removal of expired Printess projects.</comment>
+                </field>
+                <field id="retention_days" translate="label" type="text" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Project Retention Days</label>
+                    <validate>validate-number validate-greater-than-zero</validate>
+                    <depends><field id="enabled">1</field></depends>
+                    <comment>Number of days a saved project is retained before being deleted. Should align with the save-token expiry set in your Printess account settings.</comment>
+                </field>
+                <field id="order_reminder_after_days" translate="label" type="text" sortOrder="30"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Remind to Order After Days</label>
+                    <validate>validate-number validate-zero-or-greater</validate>
+                    <depends><field id="enabled">1</field></depends>
+                    <comment>Send an order reminder email this many days after a project is saved without being ordered. Leave blank to disable order reminders entirely. Minimum 1 day.</comment>
+                </field>
+                <field id="removal_reminder_before_days" translate="label" type="text" sortOrder="40"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Removal Reminder Before Days</label>
+                    <validate>validate-number validate-zero-or-greater</validate>
+                    <depends><field id="enabled">1</field></depends>
+                    <comment>Send a project deletion warning email this many days before the project expires. Leave blank to disable removal reminders entirely. Minimum 1 day.</comment>
+                </field>
+                <field id="order_reminder_template" translate="label" type="select" sortOrder="50"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Remind to Order Email Template</label>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Template</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                    <comment>Email template sent to customers who have a saved project but have not yet placed an order.</comment>
+                </field>
+                <field id="removal_reminder_template" translate="label" type="select" sortOrder="60"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Removal Reminder Email Template</label>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Template</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                    <comment>Email template sent to customers warning that their saved project is about to be permanently deleted.</comment>
+                </field>
+                <field id="email_batch_limit" translate="label" type="text" sortOrder="70"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Email Send Batch Limit</label>
+                    <validate>validate-number validate-greater-than-zero</validate>
+                    <depends><field id="enabled">1</field></depends>
+                    <comment>Maximum reminders sent by each cron run.</comment>
                 </field>
             </group>
         </section>

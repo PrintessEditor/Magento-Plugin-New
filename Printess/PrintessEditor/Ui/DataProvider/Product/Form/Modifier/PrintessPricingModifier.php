@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Printess\PrintessEditor\Ui\DataProvider\Product\Form\Modifier;
 
 use Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\AbstractModifier;
@@ -48,8 +51,9 @@ class PrintessPricingModifier extends AbstractModifier
                         'dndConfig'           => ['enabled' => false],
                         'additionalClasses'   => 'admin__field-wide',
                         'notice'              => __(
-                            'Price per page based on Printess form field values. '
-                            . 'Leave conditions empty for the default/fallback price.'
+                            'Price per additional page based on Printess form field values. '
+                            . 'Leave conditions empty for the default/fallback price. '
+                            . 'The baseline number of pages is the minimum number of pages configured in the Printess template — pages up to that threshold are included in the base price.'
                         ),
                     ],
                 ],
@@ -90,7 +94,7 @@ class PrintessPricingModifier extends AbstractModifier
                                         'componentType' => 'field',
                                         'formElement'   => 'input',
                                         'dataType'      => 'number',
-                                        'label'         => __('Price Per Page'),
+                                        'label'         => __('Price per additional page'),
                                         'dataScope'     => 'pricePerPage',
                                         'sortOrder'     => 20,
                                         'fit'           => false,

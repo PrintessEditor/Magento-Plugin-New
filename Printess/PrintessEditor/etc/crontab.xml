@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Cron:etc/crontab.xsd">
+    <group id="default">
+        <job name="printess_send_project_reminders"
+             instance="Printess\PrintessEditor\Cron\SendProjectReminders" method="execute">
+            <config_path>printess_designer/cron/send_project_reminders</config_path>
+        </job>
+        <job name="printess_remove_expired_projects"
+             instance="Printess\PrintessEditor\Cron\RemoveExpiredProjects" method="execute">
+            <config_path>printess_designer/cron/remove_expired_projects</config_path>
+        </job>
+    </group>
+</config>

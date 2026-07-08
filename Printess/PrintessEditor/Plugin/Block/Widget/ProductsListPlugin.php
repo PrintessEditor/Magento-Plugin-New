@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Printess\PrintessEditor\Plugin\Block\Widget;
 
 use Magento\CatalogWidget\Block\Product\ProductsList;

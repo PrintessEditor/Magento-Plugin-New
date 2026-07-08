@@ -1,17 +1,36 @@
 {
-    "printess_saved_projects": {
+    "printess_projects": {
         "column": {
-            "id": true,
+            "project_id": true,
             "customer_id": true,
+            "product_id": true,
+            "store_id": true,
+            "sku": true,
+            "product_name": true,
             "name": true,
             "save_token": true,
-            "created_at": true
+            "thumbnail_url": true,
+            "expires_at": true,
+            "order_reminder_sent_at": true,
+            "removal_reminder_sent_at": true,
+            "ordered_at": true,
+            "created_at": true,
+            "updated_at": true
         },
         "index": {
-            "PRINTESS_SAVED_PROJECTS_CUSTOMER_ID": true
+            "PRINTESS_PROJECT_CUSTOMER_ID_UPDATED_AT": true,
+            "PRINTESS_PROJECT_EXPIRES_AT": true,
+            "PRINTESS_PROJECT_SAVE_TOKEN": true,
+            "PRINTESS_PROJECTS_CUSTOMER_ID_UPDATED_AT": true,
+            "PRINTESS_PROJECTS_EXPIRES_AT": true,
+            "PRINTESS_PROJECTS_SAVE_TOKEN": true
         },
         "constraint": {
-            "PRIMARY": true
+            "PRIMARY": true,
+            "PRINTESS_PROJECT_CUSTOMER_ID_CUSTOMER_ENTITY_ENTITY_ID": true,
+            "PRINTESS_PROJECT_STORE_ID_STORE_STORE_ID": true,
+            "PRINTESS_PROJECTS_CUSTOMER_ID_CUSTOMER_ENTITY_ENTITY_ID": true,
+            "PRINTESS_PROJECTS_STORE_ID_STORE_STORE_ID": true
         }
     }
 }

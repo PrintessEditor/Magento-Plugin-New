@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Printess\PrintessEditor\Plugin\Helper;
 
 use Magento\Catalog\Helper\Product\Configuration;

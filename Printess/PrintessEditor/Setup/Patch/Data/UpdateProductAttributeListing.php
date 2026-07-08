@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Printess\PrintessEditor\Setup\Patch\Data;
 
 use Magento\Catalog\Model\Product;
