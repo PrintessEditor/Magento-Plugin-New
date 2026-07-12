@@ -212,13 +212,16 @@ define(['jquery'], function ($) {
         }
     }
 
-    async function fetchMinPages(module, templateName, shopToken) {
+    async function fetchMinPages(api, templateName, shopToken) {
         try {
-            if (typeof module.getDocInfoForPhotobook === 'function') {
-                var info = await module.getDocInfoForPhotobook(templateName, shopToken);
+            if (api && typeof api.getDocInfoForPhotobook === 'function') {
+                var info = await api.getDocInfoForPhotobook(templateName, shopToken);
+                console.warn('[Printess] getDocInfoForPhotobook result=', info, '_minPages will be=', ((info && info.minSpreads) || 0) * 2 - 2);
                 return ((info && info.minSpreads) || 0) * 2 - 2;
             }
-        } catch (e) { }
+        } catch (e) {
+            console.warn('[Printess] fetchMinPages error=', e);
+        }
         return 0;
     }
 
@@ -351,7 +354,6 @@ define(['jquery'], function ($) {
         }
 
         var loaderModule = await getPanelLoader();
-        _minPages = await fetchMinPages(loaderModule, opts.templateName, opts.shopToken);
         var panelRef = null;
         var loadCfg = {
             token: opts.shopToken,
@@ -415,11 +417,12 @@ define(['jquery'], function ($) {
         panelRef = await loaderModule.load(loadCfg);
         _panelEditorRef = panelRef;
 
-        // Trigger an immediate price update so the display reflects the load params
-        // (formFields are already seeded; page count will be 0 until priceChangeCallback fires).
-        if (pagePricing.length && panelRef && panelRef.ui && panelRef.ui.refreshPriceDisplay) {
-            var initialPrice = computePrice(opts.basePrice || 0, pagePricing, _currentPageCount, _currentFormFields);
-            panelRef.ui.refreshPriceDisplay({ price: formatPrice(initialPrice, opts.currencyCode, opts.locale) });
+        if (pagePricing.length) {
+            _minPages = await fetchMinPages(panelRef.api, opts.templateName, opts.shopToken);
+            if (panelRef.ui && panelRef.ui.refreshPriceDisplay) {
+                var initialPrice = computePrice(opts.basePrice || 0, pagePricing, _currentPageCount, _currentFormFields);
+                panelRef.ui.refreshPriceDisplay({ price: formatPrice(initialPrice, opts.currencyCode, opts.locale) });
+            }
         }
     }
 
@@ -487,7 +490,7 @@ define(['jquery'], function ($) {
                         throw new Error('form not found');
                     }
                     if (cfg.onAddToBasket) {
-                        try { await cfg.onAddToBasket(saveToken, thumbnailUrl); } catch (e) {}
+                        try { await cfg.onAddToBasket(saveToken, thumbnailUrl); } catch (e) { }
                     }
                     return postFormToCart(form, saveToken, thumbnailUrl);
                 }
