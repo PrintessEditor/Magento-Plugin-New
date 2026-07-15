@@ -24,10 +24,11 @@ class Rename extends AbstractAccount implements HttpPostActionInterface
     public function execute()
     {
         try {
+            $name = mb_substr(strip_tags(trim((string) $this->getRequest()->getParam('name'))), 0, 255);
             $this->projectManager->rename(
                 (int) $this->getRequest()->getParam('project_id'),
                 (int) $this->customerSession->getCustomerId(),
-                (string) $this->getRequest()->getParam('name')
+                $name
             );
             $this->messageManager->addSuccessMessage(__('The project name has been updated.'));
         } catch (LocalizedException $exception) {

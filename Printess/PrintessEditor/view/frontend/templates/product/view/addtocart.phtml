@@ -65,7 +65,11 @@ try {
         if (!in_array($_opt->getType(), ['drop_down', 'radio'])) continue;
         $_vals = [];
         foreach ((array)$_opt->getValues() as $_val) {
-            $_vals[] = ['label' => $_val->getTitle(), 'id' => (string)$_val->getOptionTypeId()];
+            $_vals[] = [
+                'label' => $_val->getTitle(),
+                'id'    => (string)$_val->getOptionTypeId(),
+                'price' => (float)$_val->getPrice(),
+            ];
         }
         if (!empty($_vals)) {
             $_customOptions[] = [

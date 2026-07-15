@@ -44,6 +44,16 @@ class PrintessApi
     }
 
     /**
+     * Returns the raw status object for a production job.
+     * Unlike pollUntilDone() this makes exactly ONE request — suitable for use in a cron job
+     * where the caller is responsible for retrying on the next cron run.
+     */
+    public function getJobStatus(string $jobId): object
+    {
+        return $this->post('/production/status/get', ['jobId' => $jobId]);
+    }
+
+    /**
      * Polls the status endpoint until the job finishes, then returns the first PDF URL.
      * Throws on error or timeout.
      */

@@ -46,6 +46,7 @@ class PrintessPricingModifier extends AbstractModifier
                     'config' => [
                         'componentType'       => 'dynamicRows',
                         'label'               => __('Page Pricing Rules'),
+                        'scopeLabel'          => __('[STORE VIEW]'),
                         'renderDefaultRecord' => false,
                         'recordTemplate'      => 'record',
                         'dndConfig'           => ['enabled' => false],

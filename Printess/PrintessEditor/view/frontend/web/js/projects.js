@@ -6,6 +6,11 @@ define([
 ], function ($, alert, confirm, $t) {
     'use strict';
 
+    // Cache the openProject function after first load so subsequent clicks
+    // bypass require() — Magento's require.js enters a bad state after the
+    // Printess component is loaded and removed from the DOM on first close.
+    var _cachedOpenProject = null;
+
     function startLoader() {
         $('body').trigger('processStart');
     }
@@ -21,6 +26,15 @@ define([
             event.preventDefault();
             event.stopPropagation();
             startLoader();
+            // Safety net: if the editor flow fails to call stopLoader within 10s, stop it anyway.
+            var _loadSafetyTimer = setTimeout(function () {
+                console.warn('[Printess] Safety stopLoader triggered after 10s — something blocked the require() callback');
+                stopLoader();
+            }, 10000);
+            function _stopLoader() {
+                clearTimeout(_loadSafetyTimer);
+                stopLoader();
+            }
 
             $.ajax({
                 url: config.openUrl,
@@ -32,7 +46,7 @@ define([
                 }
             }).then(function (response) {
                 if (!response || response.success !== true || !response.config) {
-                    stopLoader();
+                    _stopLoader();
                     alert({
                         title: $t('Unable to Open Project'),
                         content: (response && response.message) || $t('The project could not be opened. Please try again.')
@@ -40,26 +54,40 @@ define([
                     return;
                 }
 
+                if (_cachedOpenProject) {
+                    // Use the cached module reference to avoid calling require() again.
+                    // Magento's require.js enters a bad state after the Printess component
+                    // is loaded and its DOM element is removed, causing subsequent require()
+                    // calls to silently drop their callbacks.
+                    try {
+                        _cachedOpenProject(response.config);
+                    } finally {
+                        _stopLoader();
+                    }
+                    return;
+                }
                 require(['Printess_PrintessEditor/js/project-edit'], function (openProject) {
+                    _cachedOpenProject = openProject;
                     try {
                         openProject(response.config);
                     } finally {
-                        stopLoader();
+                        _stopLoader();
                     }
                 }, function () {
-                    stopLoader();
+                    console.error('[Printess] Failed to require project-edit module');
+                    _stopLoader();
                     alert({
                         title: $t('Unable to Open Project'),
                         content: $t('The Printess editor could not be loaded. Please reload the page and try again.')
                     });
                 });
             }, function (xhr) {
-                stopLoader();
-                var response = xhr.responseJSON || {};
+                console.error('[Printess] AJAX request failed', xhr.status, xhr.responseText);
+                _stopLoader();
 
                 alert({
                     title: $t('Unable to Open Project'),
-                    content: response.message || $t('The project could not be opened. Please try again.')
+                    content: (xhr.responseJSON && xhr.responseJSON.message) || $t('The project could not be opened. Please try again.')
                 });
             });
         });

@@ -37,4 +37,29 @@
             <column name="save_token"/>
         </index>
     </table>
+
+    <table name="printess_pdf_jobs" resource="default" engine="innodb" comment="Printess Async PDF Production Jobs">
+        <column xsi:type="int" name="job_id" unsigned="true" nullable="false" identity="true" comment="Job ID"/>
+        <column xsi:type="int" name="order_id" unsigned="true" nullable="false" comment="Sales Order entity_id"/>
+        <column xsi:type="int" name="order_item_id" unsigned="true" nullable="false" comment="Sales Order Item item_id"/>
+        <column xsi:type="varchar" name="save_token" nullable="false" length="512" comment="Printess Save Token"/>
+        <column xsi:type="varchar" name="printess_job_id" nullable="true" length="255" comment="Printess Production Job ID"/>
+        <column xsi:type="varchar" name="status" nullable="false" length="32" default="pending" comment="Status: pending|producing|complete|failed"/>
+        <column xsi:type="varchar" name="pdf_path" nullable="true" length="512" comment="Saved PDF path relative to var/"/>
+        <column xsi:type="smallint" name="fail_count" unsigned="true" nullable="false" default="0" comment="Consecutive failure count"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="false" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true" comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="job_id"/>
+        </constraint>
+        <index referenceId="PRINTESS_PDF_JOBS_STATUS" indexType="btree">
+            <column name="status"/>
+        </index>
+        <index referenceId="PRINTESS_PDF_JOBS_ORDER_ID" indexType="btree">
+            <column name="order_id"/>
+        </index>
+        <index referenceId="PRINTESS_PDF_JOBS_ORDER_ITEM_ID" indexType="btree">
+            <column name="order_item_id"/>
+        </index>
+    </table>
 </schema>

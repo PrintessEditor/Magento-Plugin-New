@@ -11,6 +11,7 @@ use Magento\Framework\App\Action\Action;
 use Magento\Framework\App\Action\Context;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\Result\JsonFactory;
+use Magento\Framework\Data\Form\FormKey;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Stdlib\DateTime\DateTime;
@@ -27,6 +28,7 @@ class Open extends Action implements HttpPostActionInterface
         private readonly ProductRepositoryInterface $productRepository,
         private readonly PrintessConfig $printessConfig,
         private readonly ResolverInterface $localeResolver,
+        private readonly FormKey $formKey,
         private readonly UrlInterface $urlBuilder,
         private readonly DateTime $dateTime
     ) {
@@ -80,7 +82,10 @@ class Open extends Action implements HttpPostActionInterface
                     'saveUrl' => $this->urlBuilder->getUrl('printess/project/save'),
                     'returnUrl' => $this->urlBuilder->getUrl('printess/project'),
                     'projectId' => (int) $project->getId(),
+                    'projectName' => (string) $project->getData('name'),
                     'productId' => (string) $product->getId(),
+                    'addToCartUrl' => $this->urlBuilder->getUrl('checkout/cart/add', ['product' => (int) $product->getId()]),
+                    'formKey' => $this->formKey->getFormKey(),
                     'variantOptions' => $this->buildVariantOptions($product),
                     'customOptions' => $this->buildCustomOptions($product),
                     'pagePricing' => is_array($product->getData('printess_page_pricing'))
@@ -172,7 +177,8 @@ class Open extends Action implements HttpPostActionInterface
                 foreach ((array) $_opt->getValues() as $_val) {
                     $values[] = [
                         'label' => (string) $_val->getTitle(),
-                        'id' => (string) $_val->getOptionTypeId(),
+                        'id'    => (string) $_val->getOptionTypeId(),
+                        'price' => (float)  $_val->getPrice(),
                     ];
                 }
 

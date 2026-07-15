@@ -1,11 +1,12 @@
 define([
     'jquery',
     'Magento_Ui/js/modal/alert',
-    'mage/translate'
-], function ($, alert, $t) {
+    'mage/translate',
+    'Printess_PrintessEditor/js/printess-integration'
+], function ($, alert, $t, PrintessEditor) {
     'use strict';
 
-    function saveProject(config, saveToken, thumbnailUrl) {
+    function saveProject(config, saveToken, thumbnailUrl, projectName) {
         return $.ajax({
             url: config.saveUrl,
             type: 'POST',
@@ -15,7 +16,8 @@ define([
                 project_id: config.projectId,
                 product_id: config.productId,
                 save_token: saveToken,
-                thumbnail_url: thumbnailUrl || ''
+                thumbnail_url: thumbnailUrl || '',
+                project_name: projectName || ''
             }
         }).then(function (response) {
             if (!response || response.success !== true) {
@@ -37,44 +39,57 @@ define([
     }
 
     function openEditor(config) {
-        require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessEditor) {
-            PrintessEditor.openFromProduct({
-                shopToken: config.shopToken,
-                templateName: config.templateName,
-                formId: 'product_addtocart_form',
-                variantOptions: config.variantOptions || [],
-                customOptions: config.customOptions || [],
-                pagePricing: config.pagePricing || [],
-                basePrice: config.basePrice || 0,
-                currencyCode: config.currencyCode,
-                locale: config.locale,
-                theme: config.theme,
-                magicPhotobookTheme: config.magicPhotobookTheme,
-                printSettings: config.printSettings,
-                mergeTemplate: config.mergeTemplate,
-                onAddToBasket: function () {
-                    alert({
-                        title: $t('Unable to Add to Basket'),
-                        content: $t('Use the product page to add this design to the basket.')
+        PrintessEditor.openFromProduct({
+            shopToken: config.shopToken,
+            templateName: config.templateName,
+            formId: 'product_addtocart_form',
+            addToCartUrl: config.addToCartUrl || '',
+            productId: config.productId || '',
+            formKey: config.formKey || '',
+            variantOptions: config.variantOptions || [],
+            customOptions: config.customOptions || [],
+            pagePricing: config.pagePricing || [],
+            basePrice: config.basePrice || 0,
+            currencyCode: config.currencyCode,
+            locale: config.locale,
+            theme: config.theme,
+            magicPhotobookTheme: config.magicPhotobookTheme,
+            printSettings: config.printSettings,
+            mergeTemplate: config.mergeTemplate,
+            onAddToBasket: function (saveToken, thumbnailUrl) {
+                var validThumbnail = (typeof thumbnailUrl === 'string' && thumbnailUrl.indexOf('https://') === 0)
+                    ? thumbnailUrl
+                    : '';
+                return PrintessEditor.promptProjectName(config._namePrompted ? '\x01' : (config.projectName || '')).then(function (name) {
+                    config._namePrompted = true;
+                    if (name) { config.projectName = name; }
+                    PrintessEditor.showCartLoader('Adding to Cart...');
+                    return saveProject(config, saveToken, validThumbnail, config.projectName || name).then(function (result) {
+                        return result;
+                    }, function (err) {
+                        PrintessEditor.hideCartLoader();
+                        return Promise.reject(err);
                     });
-                    return $.Deferred().reject(new Error('add to basket unavailable')).promise();
-                },
-                saveTemplateCallback: function (saveToken, type, thumbnailUrl) {
-                    var validThumbnail = (typeof thumbnailUrl === 'string' && thumbnailUrl.indexOf('https://') === 0)
-                        ? thumbnailUrl
-                        : '';
-                    return saveProject(config, saveToken, validThumbnail).then(function () {
+                });
+            },
+            saveTemplateCallback: function (saveToken, type, thumbnailUrl) {
+                var validThumbnail = (typeof thumbnailUrl === 'string' && thumbnailUrl.indexOf('https://') === 0)
+                    ? thumbnailUrl
+                    : '';
+                return PrintessEditor.promptProjectName(config._namePrompted ? '\x01' : (config.projectName || '')).then(function (name) {
+                    config._namePrompted = true;
+                    if (name) { config.projectName = name; }
+                    if (type === 'close') { PrintessEditor.showCartLoader('Saving...'); }
+                    return saveProject(config, saveToken, validThumbnail, config.projectName || name).then(function () {
                         if (type === 'close') {
                             window.location.href = config.returnUrl;
                         }
+                    }, function (err) {
+                        PrintessEditor.hideCartLoader();
+                        return Promise.reject(err);
                     });
-                }
-            });
-        }, function () {
-            alert({
-                title: $t('Unable to Open Project'),
-                content: $t('The Printess editor could not be loaded. Please reload the page and try again.')
-            });
+                });
+            }
         });
     }
 
