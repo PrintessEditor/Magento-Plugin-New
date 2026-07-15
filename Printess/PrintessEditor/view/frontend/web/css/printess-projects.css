@@ -85,8 +85,8 @@
     margin: 0;
 }
 
-.printess-project-rename,
-.printess-project-delete {
+.printess-project .printess-project-rename,
+.printess-project .printess-project-delete {
     margin-top: 0;
 }
 

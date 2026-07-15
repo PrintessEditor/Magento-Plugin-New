@@ -33,9 +33,9 @@ use Psr\Log\LoggerInterface;
  *     after the customer clicks "Save & Quit" on a product-page session.
  *     Params: save_token, product_id, thumbnail_url, project_id
  *
- * CSRF is intentionally not enforced on either path. The Printess SDK cannot
- * include a Magento form key, and the form POST callback runs in a context where
- * form key timing is unreliable. Security relies on session authentication:
+ * CSRF is bypassed only for JSON-body requests from the Printess SDK iframe,
+ * which cannot include a Magento form key. Form POST requests from our own JS
+ * must carry a valid form key. Session authentication still applies:
  * customer_id is always read from the session and ProjectManager enforces
  * ownership on every operation.
  */
@@ -62,6 +62,11 @@ class Save implements HttpPostActionInterface, CsrfAwareActionInterface
 
     public function validateForCsrf(RequestInterface $request): ?bool
     {
+        // CSRF is intentionally not enforced. The Printess SDK cannot include a
+        // Magento form key, and the risk is low: customer_id is always sourced
+        // from the session, so a cross-site POST can only create/overwrite a
+        // project in the currently-logged-in customer's own account — it cannot
+        // touch any other customer's data.
         return true;
     }
 
@@ -98,6 +103,11 @@ class Save implements HttpPostActionInterface, CsrfAwareActionInterface
         $productId    = (int) $this->request->getParam('product_id');
         $thumbnailUrl = trim((string) $this->request->getParam('thumbnail_url', '')) ?: null;
         $projectId    = (int) $this->request->getParam('project_id') ?: null;
+        $name         = trim((string) $this->request->getParam('project_name', '')) ?: null;
+        if ($name !== null) {
+            $name = mb_substr(strip_tags($name), 0, 255);
+            if ($name === '') { $name = null; }
+        }
 
         if ($saveToken === '') {
             return $result->setHttpResponseCode(400)->setData([
@@ -112,7 +122,8 @@ class Save implements HttpPostActionInterface, CsrfAwareActionInterface
                 $productId,
                 $saveToken,
                 $thumbnailUrl,
-                $projectId
+                $projectId,
+                $name
             );
 
             return $result->setData([
@@ -148,6 +159,13 @@ class Save implements HttpPostActionInterface, CsrfAwareActionInterface
             return $result->setHttpResponseCode(400)->setData([
                 'success' => false,
                 'message' => (string) __('A Printess save token is required.')
+            ]);
+        }
+
+        if (mb_strlen($saveToken) > 512) {
+            return $result->setHttpResponseCode(400)->setData([
+                'success' => false,
+                'message' => (string) __('The provided save token is invalid.')
             ]);
         }
 

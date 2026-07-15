@@ -32,5 +32,27 @@
             "PRINTESS_PROJECTS_CUSTOMER_ID_CUSTOMER_ENTITY_ENTITY_ID": true,
             "PRINTESS_PROJECTS_STORE_ID_STORE_STORE_ID": true
         }
+    },
+    "printess_pdf_jobs": {
+        "column": {
+            "job_id": true,
+            "order_id": true,
+            "order_item_id": true,
+            "save_token": true,
+            "printess_job_id": true,
+            "status": true,
+            "pdf_path": true,
+            "fail_count": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "index": {
+            "PRINTESS_PDF_JOBS_STATUS": true,
+            "PRINTESS_PDF_JOBS_ORDER_ID": true,
+            "PRINTESS_PDF_JOBS_ORDER_ITEM_ID": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
     }
 }

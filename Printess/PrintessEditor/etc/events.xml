@@ -7,7 +7,14 @@
         <observer name="printess_transfer_to_order" instance="Printess\PrintessEditor\Observer\TransferToOrder"/>
     </event>
     <event name="sales_order_place_after">
-        <observer name="printess_produce_pdf" instance="Printess\PrintessEditor\Observer\ProducePdf"/>
+        <!--
+            printess_produce_pdf is preserved for reference but intentionally disabled.
+            PDF production is now handled asynchronously by Cron\ProducePdf (every 5 min)
+            via the printess_pdf_jobs queue populated by printess_enqueue_pdf_jobs below.
+            Re-enabling this observer would block checkout for up to 120 seconds per item.
+        -->
+        <!--<observer name="printess_produce_pdf" instance="Printess\PrintessEditor\Observer\ProducePdf"/>-->
+        <observer name="printess_enqueue_pdf_jobs" instance="Printess\PrintessEditor\Observer\EnqueuePdfJobs"/>
         <observer name="printess_mark_saved_project_ordered"
                   instance="Printess\PrintessEditor\Observer\MarkSavedProjectOrdered"/>
     </event>

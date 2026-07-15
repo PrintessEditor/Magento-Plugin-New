@@ -10,6 +10,7 @@ use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Data\Form\FormKey\Validator;
 use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Checkout\Model\Session as CheckoutSession;
+use Magento\Customer\Model\Session as CustomerSession;
 
 /**
  * Updates the Printess save token on an existing cart item without removing/re-adding it.
@@ -28,19 +29,22 @@ class Update implements HttpPostActionInterface
     private Validator $formKeyValidator;
     private CheckoutSession $checkoutSession;
     private SerializerInterface $serializer;
+    private CustomerSession $customerSession;
 
     public function __construct(
         RequestInterface $request,
         JsonFactory $jsonFactory,
         Validator $formKeyValidator,
         CheckoutSession $checkoutSession,
-        SerializerInterface $serializer
+        SerializerInterface $serializer,
+        CustomerSession $customerSession
     ) {
         $this->request          = $request;
         $this->jsonFactory      = $jsonFactory;
         $this->formKeyValidator = $formKeyValidator;
         $this->checkoutSession  = $checkoutSession;
         $this->serializer       = $serializer;
+        $this->customerSession  = $customerSession;
     }
 
     public function execute()
@@ -51,9 +55,17 @@ class Update implements HttpPostActionInterface
             return $result->setData(['success' => false, 'message' => 'Invalid form key']);
         }
 
+        if (!$this->customerSession->isLoggedIn()) {
+            return $result->setHttpResponseCode(401)->setData(['success' => false, 'message' => 'Authentication required']);
+        }
+
         $itemId       = (int)$this->request->getParam('itemId');
         $saveToken    = (string)$this->request->getParam('saveToken');
         $thumbnailUrl = (string)$this->request->getParam('thumbnailUrl', '');
+
+        if (!str_starts_with($saveToken, 'st:') || strlen($saveToken) > 512) {
+            return $result->setData(['success' => false, 'message' => 'Invalid save token format']);
+        }
 
         if (!$itemId || !$saveToken) {
             return $result->setData(['success' => false, 'message' => 'Missing required parameters']);

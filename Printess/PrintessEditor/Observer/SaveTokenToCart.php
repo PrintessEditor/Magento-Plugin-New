@@ -8,16 +8,24 @@ use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Serialize\SerializerInterface;
+use Magento\Catalog\Model\Product;
+use Psr\Log\LoggerInterface;
 
 class SaveTokenToCart implements ObserverInterface
 {
     private RequestInterface $request;
     private SerializerInterface $serializer;
+    private LoggerInterface $logger;
 
-    public function __construct(RequestInterface $request, SerializerInterface $serializer)
+    public function __construct(
+        RequestInterface $request,
+        SerializerInterface $serializer,
+        LoggerInterface $logger
+    )
     {
         $this->request    = $request;
         $this->serializer = $serializer;
+        $this->logger     = $logger;
     }
 
     public function execute(Observer $observer): void
@@ -54,10 +62,18 @@ class SaveTokenToCart implements ObserverInterface
             'value'      => $this->serializer->serialize($additionalOptions),
         ]);
 
-        $pageCount = (int)($params['printessPageCount'] ?? 0);
+        $pageCount = max(0, (int)($params['printessPageCount'] ?? 0));
+        $includedPages = max(0, (int)($params['printessIncludedPages'] ?? 0));
+        $includedPages = min($includedPages, $pageCount);
+        $billablePages = max(0, $pageCount - $includedPages);
 
-        if ($pageCount > 0) {
-            $formFields  = json_decode((string)($params['printessFormFields'] ?? '{}'), true) ?: [];
+        if ($billablePages > 0) {
+            $formFields = json_decode((string)($params['printessFormFields'] ?? '{}'), true) ?: [];
+            if (!is_array($formFields)) {
+                $formFields = [];
+            }
+            $formFields = $this->mergeTrustedFormFields($item, $formFields);
+
             $pagePricing = $item->getProduct()->getData('printess_page_pricing');
             if (is_string($pagePricing)) {
                 $pagePricing = json_decode($pagePricing, true) ?: [];
@@ -67,7 +83,7 @@ class SaveTokenToCart implements ObserverInterface
             $pricePerPage = $this->resolvePricePerPage($pagePricing, $formFields);
 
             if ($pricePerPage > 0) {
-                $customPrice = (float)$item->getProduct()->getFinalPrice() + $pageCount * $pricePerPage;
+                $customPrice = (float)$item->getProduct()->getFinalPrice() + $billablePages * $pricePerPage;
                 $item->setCustomPrice($customPrice);
                 $item->setOriginalCustomPrice($customPrice);
                 $item->getProduct()->setIsSuperMode(true);
@@ -107,6 +123,116 @@ class SaveTokenToCart implements ObserverInterface
         }
 
         return $bestScore >= 0 ? $bestPrice : 0.0;
+    }
+
+    private function mergeTrustedFormFields($item, array $formFields): array
+    {
+        $trusted = $this->extractTrustedFormFieldsFromBuyRequest($item);
+        foreach ($trusted as $key => $value) {
+            $formFields[$key] = $value;
+        }
+        return $formFields;
+    }
+
+    private function extractTrustedFormFieldsFromBuyRequest($item): array
+    {
+        $trusted = [];
+        $buyRequestOption = $item->getOptionByCode('info_buyRequest');
+        if (!$buyRequestOption) {
+            return $trusted;
+        }
+
+        try {
+            $buyRequest = $this->serializer->unserialize((string)$buyRequestOption->getValue());
+        } catch (\Throwable $e) {
+            $this->logger->warning('Printess: unable to parse info_buyRequest for pricing checks', [
+                'error' => $e->getMessage()
+            ]);
+            return $trusted;
+        }
+
+        if (!is_array($buyRequest)) {
+            return $trusted;
+        }
+
+        $product = $item->getProduct();
+        $trusted = array_replace(
+            $trusted,
+            $this->extractTrustedCustomOptionFields($product, (array)($buyRequest['options'] ?? [])),
+            $this->extractTrustedVariantFields($product, (array)($buyRequest['super_attribute'] ?? []))
+        );
+
+        return $trusted;
+    }
+
+    private function extractTrustedCustomOptionFields(Product $product, array $selectedOptions): array
+    {
+        $trusted = [];
+
+        try {
+            foreach (($product->getOptions() ?: []) as $option) {
+                if (!in_array($option->getType(), ['drop_down', 'radio'], true)) {
+                    continue;
+                }
+
+                $optionId = (string)$option->getOptionId();
+                if (!isset($selectedOptions[$optionId])) {
+                    continue;
+                }
+
+                $selectedValueId = (string)$selectedOptions[$optionId];
+                foreach ((array)$option->getValues() as $value) {
+                    if ((string)$value->getOptionTypeId() !== $selectedValueId) {
+                        continue;
+                    }
+                    $trusted[(string)$option->getTitle()] = (string)$value->getTitle();
+                    break;
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->logger->warning('Printess: custom option pricing field extraction failed', [
+                'error' => $e->getMessage()
+            ]);
+        }
+
+        return $trusted;
+    }
+
+    private function extractTrustedVariantFields(Product $product, array $selectedSuperAttributes): array
+    {
+        $trusted = [];
+        if ($product->getTypeId() !== 'configurable') {
+            return $trusted;
+        }
+
+        try {
+            $typeInstance = $product->getTypeInstance();
+            foreach ($typeInstance->getConfigurableAttributes($product) as $cfgAttr) {
+                $attributeId = (string)$cfgAttr->getAttributeId();
+                if (!isset($selectedSuperAttributes[$attributeId])) {
+                    continue;
+                }
+                $selectedValueIndex = (string)$selectedSuperAttributes[$attributeId];
+                $productAttr = $cfgAttr->getProductAttribute();
+                if (!$productAttr) {
+                    continue;
+                }
+
+                foreach ((array)$cfgAttr->getOptions() as $option) {
+                    if ((string)($option['value_index'] ?? '') !== $selectedValueIndex) {
+                        continue;
+                    }
+                    $trusted[(string)$productAttr->getFrontendLabel()] = (string)($option['label'] ?? '');
+                    break;
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->logger->warning('Printess: variant pricing field extraction failed', [
+                'error' => $e->getMessage()
+            ]);
+        }
+
+        return $trusted;
     }
 
     private function getParams(): array

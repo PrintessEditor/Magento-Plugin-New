@@ -31,7 +31,8 @@ class ProjectManager
         int $productId,
         string $saveToken,
         ?string $thumbnailUrl = null,
-        ?int $projectId = null
+        ?int $projectId = null,
+        ?string $name = null
     ): Project {
         $this->assertCustomer($customerId);
         $saveToken = trim($saveToken);
@@ -61,9 +62,11 @@ class ProjectManager
                 'product_id' => $productId,
                 'sku' => (string) $product->getSku(),
                 'product_name' => (string) $product->getName(),
-                'name' => $this->getDefaultName((string) $product->getName()),
+                'name' => ($name !== null && trim($name) !== '') ? trim($name) : $this->getDefaultName((string) $product->getName()),
                 'store_id' => $storeId
             ]);
+        } elseif ($name !== null && trim($name) !== '') {
+            $project->setData('name', trim($name));
         }
 
         $storeId = (int) $project->getData('store_id');

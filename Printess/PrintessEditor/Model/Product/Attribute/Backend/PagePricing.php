@@ -25,9 +25,17 @@ class PagePricing extends AbstractBackend
         $value = $object->getData($code);
         try {
             if ($this->appState->getAreaCode() === 'adminhtml') {
+                $useDefault = $this->request->getPostValue('use_default');
+                if (is_array($useDefault) && array_key_exists($code, $useDefault)) {
+                    // Preserve store-view inheritance when "Use Default Value" is enabled.
+                    $object->setData($code, null);
+                    return;
+                }
+
                 $postProduct = $this->request->getPostValue('product');
                 if (is_array($postProduct)) {
-                    $value = $postProduct[$code] ?? [];
+                    // Dynamic rows submit no key when emptied; treat missing as explicit clear.
+                    $value = array_key_exists($code, $postProduct) ? $postProduct[$code] : [];
                 }
             }
         } catch (\Exception $e) {
