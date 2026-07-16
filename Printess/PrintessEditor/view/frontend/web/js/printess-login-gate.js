@@ -101,7 +101,6 @@ define([
                 magicPhotobookTheme: config.magicPhotobookTheme,
                 printSettings: config.printSettings,
                 mergeTemplate: config.mergeTemplate,
-                pageCountOptionId: config.pageCountOptionId || null,
                 onAddToBasket: function (saveToken, thumbnailUrl) {
                     var validThumbnail = (typeof thumbnailUrl === 'string' && thumbnailUrl.indexOf('https://') === 0)
                         ? thumbnailUrl

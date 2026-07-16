@@ -24,7 +24,6 @@ define(['jquery'], function ($) {
     var _activePanelOpts = null;     // mutable ref to the current panel config — callbacks read from this so re-opening a different project works correctly
     var _panelLoadedTemplate = '';   // save token currently loaded in the persistent editor instance
 
-    var _pageCountOptionId = null;   // Magento custom option ID for PAGE_COUNT field tracking
     var _cartLoaderOverlay = null;
 
     function showCartLoader(message) {
@@ -365,15 +364,6 @@ define(['jquery'], function ($) {
         return null;
     }
 
-    function setPageCountCustomOption(pageCount) {
-        if (!_pageCountOptionId) return;
-        var input = document.querySelector('[name="options[' + _pageCountOptionId + ']"]');
-        if (input) {
-            input.value = String(pageCount);
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-    }
-
     function setCustomOptionInMagento(customOption, value, tag) {
         var sel = document.getElementById('select_' + customOption.optionId);
         var selectedId = getCustomOptionValueId(customOption, value, tag);
@@ -600,7 +590,6 @@ define(['jquery'], function ($) {
                 0
             );
             _currentPageCount = pageCount;
-            setPageCountCustomOption(pageCount);
             if (!_minPagesResolved && pageCount > 0) {
                 _minPages = pageCount;
                 _minPagesResolved = true;
@@ -636,7 +625,6 @@ define(['jquery'], function ($) {
     async function openPanelEditor(opts) {
         _currentTemplateName = opts.templateName || '';
         _currentShopToken = opts.shopToken || '';
-        _pageCountOptionId = opts.pageCountOptionId || null;
         _activePanelOpts = opts; // always update so callbacks dispatch to the current project
 
         // _panelEditorRef is kept set after hide() — reuse the existing instance
@@ -838,6 +826,25 @@ define(['jquery'], function ($) {
         refreshEditorPrice(panelRef, opts.basePrice || 0, pagePricing, opts.currencyCode, opts.locale);
     }
 
+    async function encryptPricingData(pageCount, includedPages, formFields) {
+        var baseUrl = String(window.BASE_URL || '/').replace(/\/?$/, '/');
+        try {
+            var resp = await fetch(baseUrl + 'printess/cart/encryptPricing', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ pageCount: pageCount, includedPages: includedPages, formFields: formFields })
+            });
+            if (resp.ok) {
+                var data = await resp.json();
+                if (data && data.success && data.token) return data.token;
+            }
+        } catch (e) {
+            console.warn('Printess: pricing encryption failed, falling back to plain fields', e);
+        }
+        return null;
+    }
+
     function setOrAddHidden(form, name, value) {
         var el = form.querySelector('[name="' + name + '"]');
         if (el) {
@@ -944,12 +951,17 @@ define(['jquery'], function ($) {
         }
 
         ensureMagentoOptionInputs(form, variantOptions, customOptions);
-        setPageCountCustomOption(effectivePageCount);
         setOrAddHidden(form, 'saveToken', saveToken || '');
         setOrAddHidden(form, 'thumbnailUrl', thumbnailUrl || '');
-        setOrAddHidden(form, 'printessPageCount', String(effectivePageCount));
-        setOrAddHidden(form, 'printessIncludedPages', String(effectiveIncludedPages));
-        setOrAddHidden(form, 'printessFormFields', JSON.stringify(effectiveFormFields));
+
+        var pricingToken = await encryptPricingData(effectivePageCount, effectiveIncludedPages, effectiveFormFields);
+        if (pricingToken) {
+            setOrAddHidden(form, 'printessPricingToken', pricingToken);
+        } else {
+            setOrAddHidden(form, 'printessPageCount', String(effectivePageCount));
+            setOrAddHidden(form, 'printessIncludedPages', String(effectiveIncludedPages));
+            setOrAddHidden(form, 'printessFormFields', JSON.stringify(effectiveFormFields));
+        }
 
         var formData = new FormData(form);
 
@@ -993,7 +1005,6 @@ define(['jquery'], function ($) {
                 currencyCode: cfg.currencyCode,
                 locale: cfg.locale,
                 basePrice: cfg.basePrice,
-                pageCountOptionId: cfg.pageCountOptionId || null,
                 onAddToBasket: async function (saveToken, thumbnailUrl, apiRef) {
                     var form = getOrCreateCartForm({
                         formId: cfg.formId || 'product_addtocart_form',
@@ -1023,7 +1034,6 @@ define(['jquery'], function ($) {
         initSlimUi: function (cfg) {
             _currentTemplateName = cfg.templateName || '';
             _currentShopToken = cfg.shopToken || '';
-            _pageCountOptionId = cfg.pageCountOptionId || null;
             _slimFormId = cfg.formId || 'product_addtocart_form';
             _slimCartContext = {
                 formId: _slimFormId,
