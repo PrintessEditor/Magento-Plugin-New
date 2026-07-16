@@ -64,16 +64,27 @@ class SaveTokenToCart implements ObserverInterface
 
         $pageCount = max(0, (int)($params['printessPageCount'] ?? 0));
         $includedPages = max(0, (int)($params['printessIncludedPages'] ?? 0));
+
+        $formFields = json_decode((string)($params['printessFormFields'] ?? '{}'), true) ?: [];
+        if (!is_array($formFields)) {
+            $formFields = [];
+        }
+        $formFields = $this->mergeTrustedFormFields($item, $formFields);
+
+        // Strip PAGE_COUNT from the quote item so it never appears in cart or order display.
+        // We've already captured the value above via info_buyRequest; removing it here is safe.
+        $this->removeInternalOptionsFromDisplay($item);
+
+        // PAGE_COUNT custom option is the authoritative page count when available,
+        // since it comes from the trusted buy request rather than a plain hidden field.
+        if (isset($formFields['PAGE_COUNT']) && ($trustedCount = max(0, (int)$formFields['PAGE_COUNT'])) > 0) {
+            $pageCount = $trustedCount;
+        }
+
         $includedPages = min($includedPages, $pageCount);
         $billablePages = max(0, $pageCount - $includedPages);
 
         if ($billablePages > 0) {
-            $formFields = json_decode((string)($params['printessFormFields'] ?? '{}'), true) ?: [];
-            if (!is_array($formFields)) {
-                $formFields = [];
-            }
-            $formFields = $this->mergeTrustedFormFields($item, $formFields);
-
             $pagePricing = $item->getProduct()->getData('printess_page_pricing');
             if (is_string($pagePricing)) {
                 $pagePricing = json_decode($pagePricing, true) ?: [];
@@ -88,6 +99,33 @@ class SaveTokenToCart implements ObserverInterface
                 $item->setOriginalCustomPrice($customPrice);
                 $item->getProduct()->setIsSuperMode(true);
             }
+        }
+    }
+
+    private function removeInternalOptionsFromDisplay($item): void
+    {
+        try {
+            foreach (($item->getProduct()->getOptions() ?: []) as $option) {
+                if ($option->getType() !== 'field' || strtoupper((string)$option->getTitle()) !== 'PAGE_COUNT') {
+                    continue;
+                }
+                $optionId = (string)$option->getOptionId();
+                $item->removeOption('option_' . $optionId);
+
+                $optionIdsOpt = $item->getOptionByCode('option_ids');
+                if ($optionIdsOpt) {
+                    $ids = array_filter(
+                        explode(',', (string)$optionIdsOpt->getValue()),
+                        static fn(string $id) => trim($id) !== $optionId
+                    );
+                    $optionIdsOpt->setValue(implode(',', $ids));
+                }
+                break;
+            }
+        } catch (\Throwable $e) {
+            $this->logger->warning('Printess: failed to remove internal option from display', [
+                'error' => $e->getMessage()
+            ]);
         }
     }
 
@@ -171,22 +209,25 @@ class SaveTokenToCart implements ObserverInterface
 
         try {
             foreach (($product->getOptions() ?: []) as $option) {
-                if (!in_array($option->getType(), ['drop_down', 'radio'], true)) {
-                    continue;
-                }
+                $optionType = $option->getType();
+                $optionId   = (string)$option->getOptionId();
 
-                $optionId = (string)$option->getOptionId();
                 if (!isset($selectedOptions[$optionId])) {
                     continue;
                 }
 
-                $selectedValueId = (string)$selectedOptions[$optionId];
-                foreach ((array)$option->getValues() as $value) {
-                    if ((string)$value->getOptionTypeId() !== $selectedValueId) {
-                        continue;
+                if (in_array($optionType, ['drop_down', 'radio'], true)) {
+                    $selectedValueId = (string)$selectedOptions[$optionId];
+                    foreach ((array)$option->getValues() as $value) {
+                        if ((string)$value->getOptionTypeId() !== $selectedValueId) {
+                            continue;
+                        }
+                        $trusted[(string)$option->getTitle()] = (string)$value->getTitle();
+                        break;
                     }
-                    $trusted[(string)$option->getTitle()] = (string)$value->getTitle();
-                    break;
+                } elseif ($optionType === 'field') {
+                    // Text field options carry their raw submitted value directly.
+                    $trusted[(string)$option->getTitle()] = (string)$selectedOptions[$optionId];
                 }
             }
         } catch (\Throwable $e) {

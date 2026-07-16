@@ -59,9 +59,14 @@ if ($_product->getTypeId() === 'configurable') {
 }
 
 // Custom option sync: dropdown/radio options matched by title in JS
+// Also find the PAGE_COUNT field option ID for page-count tracking
 $_customOptions = [];
+$_pageCountOptionId = null;
 try {
     foreach (($_product->getOptions() ?: []) as $_opt) {
+        if ($_opt->getType() === 'field' && strtoupper((string)$_opt->getTitle()) === 'PAGE_COUNT') {
+            $_pageCountOptionId = (string)$_opt->getOptionId();
+        }
         if (!in_array($_opt->getType(), ['drop_down', 'radio'])) continue;
         $_vals = [];
         foreach ((array)$_opt->getValues() as $_val) {
@@ -149,7 +154,8 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
         theme:               <?= /* @noEscape */ json_encode($_theme) ?>,
         magicPhotobookTheme: <?= /* @noEscape */ json_encode($_magicPhotobookTheme) ?>,
         printSettings:       <?= /* @noEscape */ json_encode($_printSettings) ?>,
-        mergeTemplate:       <?= /* @noEscape */ json_encode($_mergeTemplate) ?>
+        mergeTemplate:       <?= /* @noEscape */ json_encode($_mergeTemplate) ?>,
+        pageCountOptionId:   <?= /* @noEscape */ json_encode($_pageCountOptionId) ?>
     });
     document.getElementById('product-addtocart-button').addEventListener('click', function () {
         PrintessEditor.addToBasketFromSlim();
@@ -202,7 +208,8 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
             "theme": <?= /* @noEscape */ json_encode($_theme) ?>,
             "magicPhotobookTheme": <?= /* @noEscape */ json_encode($_magicPhotobookTheme) ?>,
             "printSettings": <?= /* @noEscape */ json_encode($_printSettings) ?>,
-            "mergeTemplate": <?= /* @noEscape */ json_encode($_mergeTemplate) ?>
+            "mergeTemplate": <?= /* @noEscape */ json_encode($_mergeTemplate) ?>,
+            "pageCountOptionId": <?= /* @noEscape */ json_encode($_pageCountOptionId) ?>
         }
     }
 }
@@ -238,6 +245,35 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
 </div>
 <?php endif; ?>
 
+<?php endif; ?>
+
+<?php if ($_pageCountOptionId && ($_isSlimUi || $_isPrintess)) : ?>
+<style>
+    [name="options[<?= (int)$_pageCountOptionId ?>]"],
+    label[for="options-<?= (int)$_pageCountOptionId ?>-text"] { display: none !important; }
+    .field:has([name="options[<?= (int)$_pageCountOptionId ?>]"]) { display: none !important; }
+</style>
+<script>
+(function () {
+    function hidePcOption() {
+        var input = document.querySelector('[name="options[<?= (int)$_pageCountOptionId ?>]"]');
+        if (!input) return;
+        var el = input.parentElement;
+        while (el && el !== document.body) {
+            if (el.classList.contains('field')) {
+                el.style.setProperty('display', 'none', 'important');
+                return;
+            }
+            el = el.parentElement;
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', hidePcOption);
+    } else {
+        hidePcOption();
+    }
+})();
+</script>
 <?php endif; ?>
 
 <script type="text/x-magento-init">
