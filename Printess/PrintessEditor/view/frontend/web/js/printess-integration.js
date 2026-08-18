@@ -24,7 +24,6 @@ define(['jquery'], function ($) {
     var _activePanelOpts = null;     // mutable ref to the current panel config — callbacks read from this so re-opening a different project works correctly
     var _panelLoadedTemplate = '';   // save token currently loaded in the persistent editor instance
 
-    var _pageCountOptionId = null;   // Magento custom option ID for PAGE_COUNT field tracking
     var _cartLoaderOverlay = null;
 
     function showCartLoader(message) {
@@ -38,17 +37,17 @@ define(['jquery'], function ($) {
         });
         overlay.innerHTML =
             '<div style="display:flex;flex-direction:column;align-items:center;gap:16px;">' +
-              '<style>' +
-              '@keyframes printess-loader-rotate{100%{transform:rotate(360deg)}}' +
-              '@keyframes printess-loader-dash{0%{stroke-dasharray:1,200;stroke-dashoffset:0}50%{stroke-dasharray:89,200;stroke-dashoffset:-35}100%{stroke-dasharray:89,200;stroke-dashoffset:-124}}' +
-              '</style>' +
-              '<div style="width:68px;height:68px;">' +
-                '<svg viewBox="25 25 50 50" style="animation:printess-loader-rotate 2s linear infinite;height:100%;width:100%;">' +
-                  '<circle cx="50" cy="50" r="20" fill="none" stroke="#fff" stroke-width="5" stroke-miterlimit="10"' +
-                  ' style="stroke-dasharray:1,200;stroke-dashoffset:0;animation:printess-loader-dash 1.5s ease-in-out infinite;stroke-linecap:round;"/>' +
-                '</svg>' +
-              '</div>' +
-              (message ? '<span style="color:#fff;font-family:system-ui,sans-serif;font-size:15px;font-weight:500;">' + message + '</span>' : '') +
+            '<style>' +
+            '@keyframes printess-loader-rotate{100%{transform:rotate(360deg)}}' +
+            '@keyframes printess-loader-dash{0%{stroke-dasharray:1,200;stroke-dashoffset:0}50%{stroke-dasharray:89,200;stroke-dashoffset:-35}100%{stroke-dasharray:89,200;stroke-dashoffset:-124}}' +
+            '</style>' +
+            '<div style="width:68px;height:68px;">' +
+            '<svg viewBox="25 25 50 50" style="animation:printess-loader-rotate 2s linear infinite;height:100%;width:100%;">' +
+            '<circle cx="50" cy="50" r="20" fill="none" stroke="#fff" stroke-width="5" stroke-miterlimit="10"' +
+            ' style="stroke-dasharray:1,200;stroke-dashoffset:0;animation:printess-loader-dash 1.5s ease-in-out infinite;stroke-linecap:round;"/>' +
+            '</svg>' +
+            '</div>' +
+            (message ? '<span style="color:#fff;font-family:system-ui,sans-serif;font-size:15px;font-weight:500;">' + message + '</span>' : '') +
             '</div>';
         document.body.appendChild(overlay);
         _cartLoaderOverlay = overlay;
@@ -84,17 +83,17 @@ define(['jquery'], function ($) {
             overlay.innerHTML =
                 '<div style="background:#fff;border-radius:8px;padding:32px;width:380px;max-width:90vw;' +
                 'box-shadow:0 8px 32px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;">' +
-                  '<h3 style="margin:0 0 8px;font-size:18px;font-weight:600;color:#1a1a1a;">Name your project</h3>' +
-                  '<p style="margin:0 0 20px;font-size:14px;color:#555;">Give this design a name so you can find it easily later.</p>' +
-                  '<input id="printess-project-name-input" type="text" maxlength="255" placeholder="e.g. My Wedding Album"' +
-                  ' style="width:100%;box-sizing:border-box;padding:10px 12px;font-size:15px;border:1px solid #ccc;' +
-                  'border-radius:5px;outline:none;margin-bottom:20px;" />' +
-                  '<div style="display:flex;gap:12px;justify-content:flex-end;">' +
-                    '<button id="printess-name-skip" style="padding:9px 20px;border:1px solid #ccc;background:#fff;' +
-                    'border-radius:5px;font-size:14px;cursor:pointer;color:#555;">Skip</button>' +
-                    '<button id="printess-name-save" style="padding:9px 20px;background:#1a73e8;color:#fff;border:none;' +
-                    'border-radius:5px;font-size:14px;font-weight:600;cursor:pointer;">Save name</button>' +
-                  '</div>' +
+                '<h3 style="margin:0 0 8px;font-size:18px;font-weight:600;color:#1a1a1a;">Name your project</h3>' +
+                '<p style="margin:0 0 20px;font-size:14px;color:#555;">Give this design a name so you can find it easily later.</p>' +
+                '<input id="printess-project-name-input" type="text" maxlength="255" placeholder="e.g. My Wedding Album"' +
+                ' style="width:100%;box-sizing:border-box;padding:10px 12px;font-size:15px;border:1px solid #ccc;' +
+                'border-radius:5px;outline:none;margin-bottom:20px;" />' +
+                '<div style="display:flex;gap:12px;justify-content:flex-end;">' +
+                '<button id="printess-name-skip" style="padding:9px 20px;border:1px solid #ccc;background:#fff;' +
+                'border-radius:5px;font-size:14px;cursor:pointer;color:#555;">Skip</button>' +
+                '<button id="printess-name-save" style="padding:9px 20px;background:#1a73e8;color:#fff;border:none;' +
+                'border-radius:5px;font-size:14px;font-weight:600;cursor:pointer;">Save name</button>' +
+                '</div>' +
                 '</div>';
 
             document.body.appendChild(overlay);
@@ -365,15 +364,6 @@ define(['jquery'], function ($) {
         return null;
     }
 
-    function setPageCountCustomOption(pageCount) {
-        if (!_pageCountOptionId) return;
-        var input = document.querySelector('[name="options[' + _pageCountOptionId + ']"]');
-        if (input) {
-            input.value = String(pageCount);
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-    }
-
     function setCustomOptionInMagento(customOption, value, tag) {
         var sel = document.getElementById('select_' + customOption.optionId);
         var selectedId = getCustomOptionValueId(customOption, value, tag);
@@ -482,11 +472,137 @@ define(['jquery'], function ($) {
         return null;
     }
 
-    // --- saved projects helpers ---
+    // --- Utilities ---
 
-    function esc(str) {
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    function escapeHtml(str) {
+        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
+
+    // --- Load projects modal ---
+
+    function showLoadProjectsModal(projects, activeOpts) {
+        var overlay = document.createElement('div');
+        overlay.className = 'printess-owned';
+        Object.assign(overlay.style, {
+            position: 'fixed', inset: '0', zIndex: '2147483647',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)'
+        });
+
+        var cardsHtml = '';
+        if (!projects.length) {
+            cardsHtml = '<p style="color:#888;text-align:center;padding:24px 0;margin:0;">No saved projects found for this product.</p>';
+        } else {
+            cardsHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;max-height:420px;overflow-y:auto;padding:2px;">';
+            for (var i = 0; i < projects.length; i++) {
+                var p = projects[i];
+                var thumbHtml = p.thumbnailUrl
+                    ? '<img src="' + escapeHtml(p.thumbnailUrl) + '" alt="" style="width:100%;height:100px;object-fit:cover;display:block;" />'
+                    : '<div style="width:100%;height:100px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;">' +
+                    '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>' +
+                    '</div>';
+                var dateStr = '';
+                if (p.updatedAt) {
+                    try { dateStr = new Date(p.updatedAt.replace(' ', 'T') + 'Z').toLocaleDateString(); } catch (e) { dateStr = ''; }
+                }
+                cardsHtml +=
+                    '<div class="pe-project-card" data-idx="' + i + '" style="cursor:pointer;border:1px solid #e5e5e5;border-radius:6px;overflow:hidden;background:#fff;">' +
+                    thumbHtml +
+                    '<div style="padding:8px;">' +
+                    '<div style="font-size:13px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + '</div>' +
+                    (dateStr ? '<div style="font-size:11px;color:#999;margin-top:2px;">' + escapeHtml(dateStr) + '</div>' : '') +
+                    '</div></div>';
+            }
+            cardsHtml += '</div>';
+        }
+
+        overlay.innerHTML =
+            '<style>.pe-project-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.15);border-color:#bbb!important;}</style>' +
+            '<div style="background:#fff;border-radius:10px;padding:24px;width:540px;max-width:92vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.3);font-family:system-ui,sans-serif;">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-shrink:0;">' +
+            '<h3 style="margin:0;font-size:18px;font-weight:600;color:#1a1a1a;">Load Project</h3>' +
+            '<button id="pe-load-close" style="background:none;border:none;cursor:pointer;font-size:22px;line-height:1;color:#888;padding:0 4px;">&times;</button>' +
+            '</div>' +
+            cardsHtml +
+            '</div>';
+
+        document.body.appendChild(overlay);
+
+        function close() { if (overlay.parentNode) { document.body.removeChild(overlay); } }
+
+        overlay.querySelector('#pe-load-close').addEventListener('click', close);
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) { close(); } });
+
+        overlay.querySelectorAll('.pe-project-card').forEach(function (card) {
+            card.addEventListener('click', function () {
+                var idx = parseInt(card.getAttribute('data-idx'), 10);
+                var project = projects[idx];
+                close();
+                if (_panelEditorRef && _panelEditorRef.api && project && project.saveToken) {
+                    if (activeOpts) { activeOpts.projectId = project.id || null; }
+                    _panelEditorRef.api.load(project.saveToken);
+                }
+            });
+        });
+    }
+
+    function openLoadProjectsModal(activeOpts) {
+        var baseUrl = String(window.BASE_URL || '/').replace(/\/?$/, '/');
+        var productId = (activeOpts && activeOpts.productId) ? String(activeOpts.productId) : '';
+        fetch(baseUrl + 'printess/project/forproduct', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ product_id: productId })
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) { showLoadProjectsModal((data && data.projects) || [], activeOpts); })
+            .catch(function () { showLoadProjectsModal([], activeOpts); });
+    }
+
+    // --- Printess native save/load helpers ---
+
+    function buildMagentoSelections(variantOptions, customOptions) {
+        var variantSelections = {};
+        var customOptionSelections = {};
+        (variantOptions || []).forEach(function (attr) {
+            var selected = getSelectedVariantLabel(attr);
+            if (selected) { variantSelections[attr.label] = selected; }
+        });
+        (customOptions || []).forEach(function (opt) {
+            var sel = document.getElementById('select_' + opt.optionId);
+            if (!sel || !sel.value) { return; }
+            for (var i = 0; i < opt.values.length; i++) {
+                if (String(opt.values[i].id) === String(sel.value)) {
+                    customOptionSelections[opt.title] = opt.values[i].label;
+                    break;
+                }
+            }
+        });
+        return { variantSelections: variantSelections, customOptionSelections: customOptionSelections };
+    }
+
+    function buildShopData(opts) {
+        var selections = buildMagentoSelections(opts.variantOptions || [], opts.customOptions || []);
+        return {
+            shopId: opts.shopToken || '',
+            shopUserId: opts.shopUserId || '',
+            product: {
+                id: opts.productId || '',
+                displayName: opts.productDisplayName || '',
+                shopUrl: opts.productUrl || ''
+            },
+            data: {
+                productId: opts.productId || '',
+                projectId: opts.projectId || null,
+                variantSelections: selections.variantSelections,
+                customOptionSelections: selections.customOptionSelections,
+                formFields: _currentFormFields
+            }
+        };
+    }
+
+    // --- saved projects helpers ---
 
     // --- pricing helpers ---
 
@@ -600,7 +716,6 @@ define(['jquery'], function ($) {
                 0
             );
             _currentPageCount = pageCount;
-            setPageCountCustomOption(pageCount);
             if (!_minPagesResolved && pageCount > 0) {
                 _minPages = pageCount;
                 _minPagesResolved = true;
@@ -636,7 +751,6 @@ define(['jquery'], function ($) {
     async function openPanelEditor(opts) {
         _currentTemplateName = opts.templateName || '';
         _currentShopToken = opts.shopToken || '';
-        _pageCountOptionId = opts.pageCountOptionId || null;
         _activePanelOpts = opts; // always update so callbacks dispatch to the current project
 
         // _panelEditorRef is kept set after hide() — reuse the existing instance
@@ -644,7 +758,7 @@ define(['jquery'], function ($) {
         if (_panelEditorRef) {
             _activePanelOpts = opts;
             try {
-                var ui  = _panelEditorRef.ui  || _panelEditorRef;
+                var ui = _panelEditorRef.ui || _panelEditorRef;
                 var api = _panelEditorRef.api || _panelEditorRef;
 
                 if (ui && typeof ui.show === 'function') {
@@ -676,7 +790,7 @@ define(['jquery'], function ($) {
                             if (value === '' || value === undefined) return;
                             _currentFormFields[name] = value;
                             var reuseVariantOptions = reuseOpts.variantOptions || [];
-                            var reuseCustomOptions  = reuseOpts.customOptions  || [];
+                            var reuseCustomOptions = reuseOpts.customOptions || [];
                             var attr = findMatchingVariantAttr(reuseVariantOptions, name, name);
                             if (attr) { setVariantInMagento(attr, value); return; }
                             var opt = findMatchingCustomOption(reuseCustomOptions, name, name);
@@ -745,7 +859,7 @@ define(['jquery'], function ($) {
             fieldHandlers.push(function (fieldName, value, tag, fieldLabel) {
                 var activeOpts = _activePanelOpts || opts;
                 var currentVariantOptions = activeOpts.variantOptions || [];
-                var currentCustomOptions  = activeOpts.customOptions  || [];
+                var currentCustomOptions = activeOpts.customOptions || [];
                 var attr = findMatchingVariantAttr(currentVariantOptions, fieldName, fieldLabel);
                 if (attr) { setVariantInMagento(attr, value); return; }
                 var opt = findMatchingCustomOption(currentCustomOptions, fieldName, fieldLabel);
@@ -770,15 +884,67 @@ define(['jquery'], function ($) {
         if (opts.magicPhotobookTheme) loadCfg.magicPhotobookTheme = opts.magicPhotobookTheme;
         if (opts.printSettings) loadCfg.printSettings = opts.printSettings;
         if (opts.mergeTemplate) loadCfg.attach = { mergeTemplates: [{ templateName: opts.mergeTemplate }] };
-        if (opts.saveTemplateCallback) {
-            loadCfg.saveTemplateCallback = function (saveToken, type, thumbnailUrl) {
-                var activeOpts = _activePanelOpts || opts;
-                if (activeOpts.saveTemplateCallback) {
-                    return activeOpts.saveTemplateCallback(saveToken, type, thumbnailUrl);
-                }
-            };
-        }
-        if (opts.loadTemplateButtonCallback) loadCfg.loadTemplateButtonCallback = opts.loadTemplateButtonCallback;
+        // Printess native save/load callbacks
+        loadCfg.isShopUserLoggedInCallback = function () {
+            var activeOpts = _activePanelOpts || opts;
+            return Promise.resolve(activeOpts.isLoggedIn !== false);
+        };
+        loadCfg.getShopProjectDisplayNameCallback = function () {
+            var activeOpts = _activePanelOpts || opts;
+            return Promise.resolve(activeOpts.productDisplayName || '');
+        };
+        loadCfg.getShopDataCallback = async function () {
+            var activeOpts = _activePanelOpts || opts;
+            var shopData = buildShopData(activeOpts);
+            if (!shopData.shopUserId) {
+                try {
+                    var baseUrl = String(window.BASE_URL || '/').replace(/\/?$/, '/');
+                    var r = await fetch(baseUrl + 'rest/V1/customers/me', {
+                        credentials: 'same-origin',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    if (r.ok) {
+                        var customer = await r.json();
+                        if (customer && customer.id) {
+                            shopData.shopUserId = String(customer.id);
+                            activeOpts.shopUserId = String(customer.id);
+                        }
+                    }
+                } catch (e) { /* non-fatal */ }
+            }
+            return shopData;
+        };
+        // Called when the user loads a saved project — restores Magento variant/option state
+        // from the shopData.data we stored via getShopDataCallback at save time.
+        loadCfg.getShopSavedDataCallback = function (shopData) {
+            var data = (shopData && shopData.data) || {};
+            var activeOpts = _activePanelOpts || opts;
+
+            if (data.variantSelections) {
+                (activeOpts.variantOptions || []).forEach(function (attr) {
+                    var v = data.variantSelections[attr.label];
+                    if (v) { setVariantInMagento(attr, v); }
+                });
+            }
+
+            if (data.customOptionSelections) {
+                (activeOpts.customOptions || []).forEach(function (opt) {
+                    var v = data.customOptionSelections[opt.title];
+                    if (v) {
+                        var selectedId = setCustomOptionInMagento(opt, v, null);
+                        trackOptionPrice(opt, selectedId);
+                    }
+                });
+            }
+
+            if (data.projectId) { activeOpts.projectId = data.projectId; }
+
+            refreshEditorPrice(_panelEditorRef, activeOpts.basePrice || 0, activeOpts.pagePricing || [], activeOpts.currencyCode, activeOpts.locale);
+        };
+        loadCfg.shopLoginCallback = function (type) {
+            var activeOpts = _activePanelOpts || opts;
+            if (activeOpts.onShopLogin) { activeOpts.onShopLogin(type); }
+        };
         loadCfg.backButtonCallback = function () {
             var wasHistoryPushed = _panelHistoryPushed;
             closePanelEditor(); // calls hide(), keeps _panelEditorRef set for reuse
@@ -944,9 +1110,9 @@ define(['jquery'], function ($) {
         }
 
         ensureMagentoOptionInputs(form, variantOptions, customOptions);
-        setPageCountCustomOption(effectivePageCount);
         setOrAddHidden(form, 'saveToken', saveToken || '');
         setOrAddHidden(form, 'thumbnailUrl', thumbnailUrl || '');
+
         setOrAddHidden(form, 'printessPageCount', String(effectivePageCount));
         setOrAddHidden(form, 'printessIncludedPages', String(effectiveIncludedPages));
         setOrAddHidden(form, 'printessFormFields', JSON.stringify(effectiveFormFields));
@@ -993,7 +1159,13 @@ define(['jquery'], function ($) {
                 currencyCode: cfg.currencyCode,
                 locale: cfg.locale,
                 basePrice: cfg.basePrice,
-                pageCountOptionId: cfg.pageCountOptionId || null,
+                shopUserId: cfg.shopUserId || '',
+                productId: cfg.productId || '',
+                productDisplayName: cfg.productName || '',
+                productUrl: cfg.productUrl || '',
+                isLoggedIn: cfg.isLoggedIn !== false,
+                projectId: cfg.projectId || null,
+                onShopLogin: cfg.onShopLogin || null,
                 onAddToBasket: async function (saveToken, thumbnailUrl, apiRef) {
                     var form = getOrCreateCartForm({
                         formId: cfg.formId || 'product_addtocart_form',
@@ -1005,13 +1177,10 @@ define(['jquery'], function ($) {
                         console.error('Printess: add-to-cart form not found');
                         throw new Error('form not found');
                     }
-                    if (cfg.onAddToBasket) {
-                        try { await cfg.onAddToBasket(saveToken, thumbnailUrl); } catch (e) {}
-                    }
+                    showCartLoader('Adding to Cart...');
                     return postFormToCart(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef);
                 }
             };
-            panelCfg.saveTemplateCallback = cfg.saveTemplateCallback || buildSaveCallback();
             openPanelEditor(panelCfg);
         },
 
@@ -1023,7 +1192,6 @@ define(['jquery'], function ($) {
         initSlimUi: function (cfg) {
             _currentTemplateName = cfg.templateName || '';
             _currentShopToken = cfg.shopToken || '';
-            _pageCountOptionId = cfg.pageCountOptionId || null;
             _slimFormId = cfg.formId || 'product_addtocart_form';
             _slimCartContext = {
                 formId: _slimFormId,
