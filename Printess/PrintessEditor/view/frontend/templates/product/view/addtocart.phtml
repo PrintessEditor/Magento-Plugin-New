@@ -9,7 +9,17 @@ $_locale       = $_printessData->getLocale();
 $_store        = $block->getProduct()->getStore();
 $_currencyCode = $_store->getCurrentCurrencyCode();
 $_template       = (string)($_product->getData('printess_template') ?? '');
-$_mergeTemplate  = (string)($_product->getData('printess_merge_template') ?? '');
+$_mergeTemplates = json_encode(array_values(array_map(
+    static function (array $r): array {
+        $entry = ['templateName' => (string)($r['mergeTemplate'] ?? '')];
+        if (($r['mergeMode'] ?? '') !== '') { $entry['mergeMode'] = (string)$r['mergeMode']; }
+        return $entry;
+    },
+    array_filter(
+        (array)($_product->getData('printess_merge_template') ?: []),
+        static fn($r): bool => is_array($r) && trim((string)($r['mergeTemplate'] ?? '')) !== ''
+    )
+)));
 $_shopToken = $_config->getShopToken();
 $_isSlimUi  = $_template !== '' && $_shopToken !== '' && (bool)$_product->getData('printess_slim_ui');
 $_isPrintess = $_template !== '' && $_shopToken !== '' && !$_isSlimUi;
@@ -29,6 +39,17 @@ $_magicPhotobookTheme = (string)($_product->getData('printess_magic_photobook_th
 // Per-page pricing
 $_pagePricing = json_encode($_product->getData('printess_page_pricing') ?: []);
 $_basePrice   = (float)$_product->getFinalPrice();
+
+// Predefined form fields: convert {fieldName, fieldValue} storage format to {name, value} for JS
+$_predefinedFormFields = json_encode(array_values(array_map(
+    static function (array $row): array {
+        return ['name' => (string)($row['fieldName'] ?? ''), 'value' => (string)($row['fieldValue'] ?? '')];
+    },
+    array_filter(
+        (array)($_product->getData('printess_form_fields') ?: []),
+        static function (array $row): bool { return trim((string)($row['fieldName'] ?? '')) !== ''; }
+    )
+)));
 
 // Auto variant sync: all configurable attributes, matched by label in JS
 $_variantOptions = [];
@@ -59,14 +80,9 @@ if ($_product->getTypeId() === 'configurable') {
 }
 
 // Custom option sync: dropdown/radio options matched by title in JS
-// Also find the PAGE_COUNT field option ID for page-count tracking
 $_customOptions = [];
-$_pageCountOptionId = null;
 try {
     foreach (($_product->getOptions() ?: []) as $_opt) {
-        if ($_opt->getType() === 'field' && strtoupper((string)$_opt->getTitle()) === 'PAGE_COUNT') {
-            $_pageCountOptionId = (string)$_opt->getOptionId();
-        }
         if (!in_array($_opt->getType(), ['drop_down', 'radio'])) continue;
         $_vals = [];
         foreach ((array)$_opt->getValues() as $_val) {
@@ -154,8 +170,8 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
         theme:               <?= /* @noEscape */ json_encode($_theme) ?>,
         magicPhotobookTheme: <?= /* @noEscape */ json_encode($_magicPhotobookTheme) ?>,
         printSettings:       <?= /* @noEscape */ json_encode($_printSettings) ?>,
-        mergeTemplate:       <?= /* @noEscape */ json_encode($_mergeTemplate) ?>,
-        pageCountOptionId:   <?= /* @noEscape */ json_encode($_pageCountOptionId) ?>
+        mergeTemplates:      <?= /* @noEscape */ $_mergeTemplates ?>,
+        predefinedFormFields: <?= /* @noEscape */ $_predefinedFormFields ?>
     });
     document.getElementById('product-addtocart-button').addEventListener('click', function () {
         PrintessEditor.addToBasketFromSlim();
@@ -194,6 +210,9 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
     ".printess-design-action": {
         "Printess_PrintessEditor/js/printess-login-gate": {
             "productId": <?= /* @noEscape */ json_encode((string)$_product->getId()) ?>,
+            "productName": <?= /* @noEscape */ json_encode((string)$_product->getName()) ?>,
+            "productUrl": <?= /* @noEscape */ json_encode((string)$_product->getProductUrl()) ?>,
+            "shopUserId": <?= /* @noEscape */ json_encode($_printessData->getShopUserId()) ?>,
             "saveUrl": <?= /* @noEscape */ json_encode($block->getUrl('printess/project/save')) ?>,
             "projectsUrl": <?= /* @noEscape */ json_encode($block->getUrl('printess/project/index')) ?>,
             "shopToken": <?= /* @noEscape */ json_encode($_shopToken) ?>,
@@ -208,8 +227,8 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
             "theme": <?= /* @noEscape */ json_encode($_theme) ?>,
             "magicPhotobookTheme": <?= /* @noEscape */ json_encode($_magicPhotobookTheme) ?>,
             "printSettings": <?= /* @noEscape */ json_encode($_printSettings) ?>,
-            "mergeTemplate": <?= /* @noEscape */ json_encode($_mergeTemplate) ?>,
-            "pageCountOptionId": <?= /* @noEscape */ json_encode($_pageCountOptionId) ?>
+            "mergeTemplates": <?= /* @noEscape */ $_mergeTemplates ?>,
+            "predefinedFormFields": <?= /* @noEscape */ $_predefinedFormFields ?>
         }
     }
 }
@@ -245,35 +264,6 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
 </div>
 <?php endif; ?>
 
-<?php endif; ?>
-
-<?php if ($_pageCountOptionId && ($_isSlimUi || $_isPrintess)) : ?>
-<style>
-    [name="options[<?= (int)$_pageCountOptionId ?>]"],
-    label[for="options-<?= (int)$_pageCountOptionId ?>-text"] { display: none !important; }
-    .field:has([name="options[<?= (int)$_pageCountOptionId ?>]"]) { display: none !important; }
-</style>
-<script>
-(function () {
-    function hidePcOption() {
-        var input = document.querySelector('[name="options[<?= (int)$_pageCountOptionId ?>]"]');
-        if (!input) return;
-        var el = input.parentElement;
-        while (el && el !== document.body) {
-            if (el.classList.contains('field')) {
-                el.style.setProperty('display', 'none', 'important');
-                return;
-            }
-            el = el.parentElement;
-        }
-    }
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', hidePcOption);
-    } else {
-        hidePcOption();
-    }
-})();
-</script>
 <?php endif; ?>
 
 <script type="text/x-magento-init">

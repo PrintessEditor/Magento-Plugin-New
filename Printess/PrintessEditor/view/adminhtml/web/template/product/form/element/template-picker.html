@@ -1,0 +1,227 @@
+<style>
+.ptp-bar{display:flex;align-items:center;gap:8px}
+.ptp-bar .admin__control-text{flex:1}
+.ptp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center}
+.ptp-dialog{background:#fff;width:980px;max-width:96vw;height:78vh;display:flex;flex-direction:column;border-radius:4px;box-shadow:0 8px 32px rgba(0,0,0,.3);overflow:hidden}
+.ptp-titlebar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f5f5f5;border-bottom:1px solid #ddd;flex-shrink:0}
+.ptp-titlebar h3{margin:0;font-size:16px;font-weight:600}
+.ptp-close{background:none;border:none;font-size:20px;cursor:pointer;line-height:1;color:#666;padding:4px 8px}
+.ptp-close:hover{color:#111}
+.ptp-tabs{display:flex;border-bottom:2px solid #ddd;flex-shrink:0}
+.ptp-tab{padding:10px 20px;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;font-size:14px;cursor:pointer;color:#666}
+.ptp-tab.active{border-bottom-color:#006bb4;color:#006bb4;font-weight:600}
+.ptp-body{flex:1;display:flex;overflow:hidden}
+/* templates tab */
+.ptp-sidebar{width:200px;flex-shrink:0;border-right:1px solid #ddd;overflow-y:auto;padding:8px 0}
+.ptp-dir-item{display:flex;align-items:center;gap:6px;padding:6px 10px;cursor:pointer;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptp-dir-item:hover,.ptp-dir-item.active{background:#e8f0fe;color:#1a73e8}
+.ptp-dir-all{padding:6px 10px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:1px solid #eee;margin-bottom:4px}
+.ptp-dir-all:hover,.ptp-dir-all.active{background:#e8f0fe;color:#1a73e8}
+.ptp-main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.ptp-search{padding:10px 12px;border-bottom:1px solid #eee;flex-shrink:0}
+.ptp-search input{width:100%;padding:6px 10px;border:1px solid #ccc;border-radius:3px;font-size:13px}
+.ptp-grid{flex:1;overflow-y:auto;padding:12px;display:flex;flex-wrap:wrap;gap:12px;align-content:flex-start}
+.ptp-tile{width:140px;border:2px solid #e0e0e0;border-radius:4px;cursor:pointer;overflow:hidden;transition:border-color .15s}
+.ptp-tile:hover{border-color:#90b8d8}
+.ptp-tile.selected{border-color:#006bb4}
+.ptp-tile-img{width:100%;height:100px;object-fit:cover;background:#f5f5f5;display:block}
+.ptp-tile-noimg{width:100%;height:100px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px}
+.ptp-tile-name{padding:6px 8px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#fafafa}
+/* snippets tab */
+.ptp-snippets-layout{flex:1;display:flex;overflow:hidden}
+.ptp-filter-panel{width:220px;flex-shrink:0;border-right:1px solid #ddd;overflow-y:auto;padding:10px}
+.ptp-filter-panel h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;color:#888;letter-spacing:.05em}
+.ptp-chip{display:inline-flex;align-items:center;padding:3px 10px;border:1px solid #ccc;border-radius:12px;font-size:12px;cursor:pointer;margin:3px 3px 3px 0;transition:all .15s}
+.ptp-chip:hover{border-color:#006bb4;color:#006bb4}
+.ptp-chip.active{background:#006bb4;border-color:#006bb4;color:#fff}
+.ptp-loading{padding:20px;color:#888;font-size:13px;text-align:center;width:100%}
+/* half-width column in dynamicRows (mergeMode select) */
+.ptp-col-half{flex:0 0 auto!important;width:50%!important;max-width:50%!important}
+/* footer */
+.ptp-footer{display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;border-top:1px solid #ddd;flex-shrink:0;background:#fafafa}
+</style>
+
+<div class="ptp-bar">
+    <input class="admin__control-text"
+           type="text"
+           data-bind="value: value, attr: { name: inputName, id: uid, placeholder: placeholder }"
+           readonly="readonly"/>
+    <button type="button"
+            class="action-default scalable"
+            data-bind="click: openPicker">
+        Browse&hellip;
+    </button>
+</div>
+
+<!-- ko if: pickerOpen() -->
+<div class="ptp-overlay" data-bind="click: function(d,e){ if(e.target===e.currentTarget) closePicker() }">
+    <div class="ptp-dialog" data-bind="click: function(){}" >
+
+        <!-- Title bar -->
+        <div class="ptp-titlebar">
+            <h3>Select Template</h3>
+            <button type="button" class="ptp-close" data-bind="click: closePicker">&times;</button>
+        </div>
+
+        <!-- Tabs (only shown when snippets tab is enabled) -->
+        <!-- ko if: showSnippetsTab -->
+        <div class="ptp-tabs">
+            <button type="button" class="ptp-tab"
+                    data-bind="click: function(){ switchTab('templates') }, css: { active: activeTab() === 'templates' }">
+                Templates
+            </button>
+            <button type="button" class="ptp-tab"
+                    data-bind="click: function(){ switchTab('snippets') }, css: { active: activeTab() === 'snippets' }">
+                Layout Snippets
+            </button>
+        </div>
+        <!-- /ko -->
+
+        <!-- ── Templates tab ─────────────────────────────────────────── -->
+        <!-- ko if: activeTab() === 'templates' -->
+        <div class="ptp-body">
+            <!-- Directory sidebar -->
+            <div class="ptp-sidebar">
+                <div class="ptp-dir-all"
+                     data-bind="click: function(){ selectDirectory(null) }, css: { active: selectedDirId() === null }">
+                    All templates
+                </div>
+                <!-- ko foreach: directories() -->
+                <div class="ptp-dir-item"
+                     data-bind="click: function(){ $parent.selectDirectory($data.id) },
+                                css: { active: $parent.selectedDirId() === $data.id },
+                                style: { paddingLeft: (10 + $data.depth * 14) + 'px' },
+                                text: $data.name,
+                                attr: { title: $data.name }">
+                </div>
+                <!-- /ko -->
+            </div>
+
+            <!-- Template grid -->
+            <div class="ptp-main">
+                <div class="ptp-search">
+                    <input type="text"
+                           placeholder="Filter by name&hellip;"
+                           data-bind="textInput: templateFilter"/>
+                </div>
+                <div class="ptp-grid">
+                    <!-- ko if: loadingTemplates() -->
+                    <div class="ptp-loading">Loading&hellip;</div>
+                    <!-- /ko -->
+                    <!-- ko ifnot: loadingTemplates() -->
+                    <!-- ko foreach: filteredTemplates() -->
+                    <div class="ptp-tile"
+                         data-bind="click: function(){ $parent.selectTemplate($data) },
+                                    css: { selected: $parent.selectedTemplate() && $parent.selectedTemplate().name === $data.name }">
+                        <!-- ko if: $data.thumbnailUrl -->
+                        <img class="ptp-tile-img"
+                             data-bind="attr: { src: $data.thumbnailUrl, alt: $data.name }"/>
+                        <!-- /ko -->
+                        <!-- ko ifnot: $data.thumbnailUrl -->
+                        <div class="ptp-tile-noimg">No preview</div>
+                        <!-- /ko -->
+                        <div class="ptp-tile-name" data-bind="text: $data.name, attr: { title: $data.name }"></div>
+                    </div>
+                    <!-- /ko -->
+                    <!-- ko if: filteredTemplates().length === 0 -->
+                    <div class="ptp-loading">No templates found.</div>
+                    <!-- /ko -->
+                    <!-- /ko -->
+                </div>
+            </div>
+        </div>
+        <!-- /ko -->
+
+        <!-- ── Layout Snippets tab ────────────────────────────────────── -->
+        <!-- ko if: showSnippetsTab && activeTab() === 'snippets' -->
+        <div class="ptp-body">
+            <div class="ptp-snippets-layout">
+
+                <!-- Filter panel -->
+                <div class="ptp-filter-panel">
+                    <!-- ko if: loadingTags() -->
+                    <div class="ptp-loading">Loading tags&hellip;</div>
+                    <!-- /ko -->
+                    <!-- ko if: !loadingTags() && tagsError() -->
+                    <div style="color:#c00;font-size:12px;padding:8px 0" data-bind="text: tagsError"></div>
+                    <!-- /ko -->
+                    <!-- ko if: !loadingTags() && !tagsError() -->
+                    <h4>Tags</h4>
+                    <!-- ko foreach: tags() -->
+                    <span class="ptp-chip"
+                          data-bind="text: $data,
+                                     click: function(){ $parent.toggleTag($data) },
+                                     css: { active: $parent.selectedTags().indexOf($data) !== -1 }">
+                    </span>
+                    <!-- /ko -->
+                    <!-- ko if: selectedTags().length > 0 -->
+                    <h4 style="margin-top:14px">Keywords</h4>
+                    <!-- ko foreach: keywords() -->
+                    <span class="ptp-chip"
+                          data-bind="text: $data,
+                                     click: function(){ $parent.toggleKeyword($data) },
+                                     css: { active: $parent.selectedKeywords().indexOf($data) !== -1 }">
+                    </span>
+                    <!-- /ko -->
+                    <!-- ko if: keywords().length === 0 -->
+                    <div style="font-size:12px;color:#aaa;margin-top:6px">No keywords available.</div>
+                    <!-- /ko -->
+                    <!-- /ko -->
+                    <!-- /ko -->
+                </div>
+
+                <!-- Snippets grid -->
+                <div class="ptp-main">
+                    <div class="ptp-grid">
+                        <!-- ko if: loadingSnippets() -->
+                        <div class="ptp-loading">Loading snippets&hellip;</div>
+                        <!-- /ko -->
+                        <!-- ko if: !loadingSnippets() && snippetsError() -->
+                        <div class="ptp-loading" style="color:#c00" data-bind="text: snippetsError"></div>
+                        <!-- /ko -->
+                        <!-- ko if: !loadingSnippets() && !snippetsError() && selectedTags().length === 0 -->
+                        <div class="ptp-loading">Select at least one tag to load snippets.</div>
+                        <!-- /ko -->
+                        <!-- ko if: !loadingSnippets() && !snippetsError() -->
+                        <!-- ko foreach: snippets() -->
+                        <div class="ptp-tile"
+                             data-bind="click: function(){ $parent.selectSnippet($data) },
+                                        css: { selected: $parent.selectedSnippet() && $parent.selectedSnippet().id === $data.id }">
+                            <!-- ko if: $data.thumbnailUrl -->
+                            <img class="ptp-tile-img"
+                                 data-bind="attr: { src: $data.thumbnailUrl, alt: $data.name }"/>
+                            <!-- /ko -->
+                            <!-- ko ifnot: $data.thumbnailUrl -->
+                            <div class="ptp-tile-noimg">No preview</div>
+                            <!-- /ko -->
+                            <div class="ptp-tile-name" data-bind="text: $data.name, attr: { title: $data.name }"></div>
+                        </div>
+                        <!-- /ko -->
+                        <!-- ko if: selectedTags().length > 0 && snippets().length === 0 -->
+                        <div class="ptp-loading">No snippets found for the selected tags/keywords.</div>
+                        <!-- /ko -->
+                        <!-- /ko -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        <!-- /ko -->
+
+        <!-- Footer -->
+        <div class="ptp-footer">
+            <button type="button"
+                    class="action-secondary scalable"
+                    data-bind="click: closePicker">
+                Cancel
+            </button>
+            <button type="button"
+                    class="action-primary scalable"
+                    data-bind="click: confirmSelection, disable: !canConfirm()">
+                Confirm selection
+            </button>
+        </div>
+
+    </div>
+</div>
+<!-- /ko -->

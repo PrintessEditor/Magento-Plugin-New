@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Printess\PrintessEditor\Observer;
 
+use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Serialize\SerializerInterface;
-use Magento\Catalog\Model\Product;
+use Printess\PrintessEditor\Model\ProjectManager;
 use Psr\Log\LoggerInterface;
 
 class SaveTokenToCart implements ObserverInterface
@@ -16,16 +17,22 @@ class SaveTokenToCart implements ObserverInterface
     private RequestInterface $request;
     private SerializerInterface $serializer;
     private LoggerInterface $logger;
+    private CustomerSession $customerSession;
+    private ProjectManager $projectManager;
 
     public function __construct(
         RequestInterface $request,
         SerializerInterface $serializer,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        CustomerSession $customerSession,
+        ProjectManager $projectManager
     )
     {
-        $this->request    = $request;
-        $this->serializer = $serializer;
-        $this->logger     = $logger;
+        $this->request         = $request;
+        $this->serializer      = $serializer;
+        $this->logger          = $logger;
+        $this->customerSession = $customerSession;
+        $this->projectManager  = $projectManager;
     }
 
     public function execute(Observer $observer): void
@@ -62,24 +69,9 @@ class SaveTokenToCart implements ObserverInterface
             'value'      => $this->serializer->serialize($additionalOptions),
         ]);
 
-        $pageCount = max(0, (int)($params['printessPageCount'] ?? 0));
-        $includedPages = max(0, (int)($params['printessIncludedPages'] ?? 0));
+        $this->syncProjectToDb($item, $params['saveToken'], $params['thumbnailUrl'] ?? null);
 
-        $formFields = json_decode((string)($params['printessFormFields'] ?? '{}'), true) ?: [];
-        if (!is_array($formFields)) {
-            $formFields = [];
-        }
-        $formFields = $this->mergeTrustedFormFields($item, $formFields);
-
-        // Strip PAGE_COUNT from the quote item so it never appears in cart or order display.
-        // We've already captured the value above via info_buyRequest; removing it here is safe.
-        $this->removeInternalOptionsFromDisplay($item);
-
-        // PAGE_COUNT custom option is the authoritative page count when available,
-        // since it comes from the trusted buy request rather than a plain hidden field.
-        if (isset($formFields['PAGE_COUNT']) && ($trustedCount = max(0, (int)$formFields['PAGE_COUNT'])) > 0) {
-            $pageCount = $trustedCount;
-        }
+        [$pageCount, $includedPages, $formFields] = $this->decodePricingParams($params);
 
         $includedPages = min($includedPages, $pageCount);
         $billablePages = max(0, $pageCount - $includedPages);
@@ -102,31 +94,14 @@ class SaveTokenToCart implements ObserverInterface
         }
     }
 
-    private function removeInternalOptionsFromDisplay($item): void
+    private function decodePricingParams(array $params): array
     {
-        try {
-            foreach (($item->getProduct()->getOptions() ?: []) as $option) {
-                if ($option->getType() !== 'field' || strtoupper((string)$option->getTitle()) !== 'PAGE_COUNT') {
-                    continue;
-                }
-                $optionId = (string)$option->getOptionId();
-                $item->removeOption('option_' . $optionId);
-
-                $optionIdsOpt = $item->getOptionByCode('option_ids');
-                if ($optionIdsOpt) {
-                    $ids = array_filter(
-                        explode(',', (string)$optionIdsOpt->getValue()),
-                        static fn(string $id) => trim($id) !== $optionId
-                    );
-                    $optionIdsOpt->setValue(implode(',', $ids));
-                }
-                break;
-            }
-        } catch (\Throwable $e) {
-            $this->logger->warning('Printess: failed to remove internal option from display', [
-                'error' => $e->getMessage()
-            ]);
-        }
+        $formFields = json_decode((string)($params['printessFormFields'] ?? '{}'), true) ?: [];
+        return [
+            max(0, (int)($params['printessPageCount']     ?? 0)),
+            max(0, (int)($params['printessIncludedPages'] ?? 0)),
+            is_array($formFields) ? $formFields : [],
+        ];
     }
 
     private function resolvePricePerPage(array $rules, array $formFields): float
@@ -163,117 +138,25 @@ class SaveTokenToCart implements ObserverInterface
         return $bestScore >= 0 ? $bestPrice : 0.0;
     }
 
-    private function mergeTrustedFormFields($item, array $formFields): array
+    private function syncProjectToDb($item, string $saveToken, ?string $thumbnailUrl): void
     {
-        $trusted = $this->extractTrustedFormFieldsFromBuyRequest($item);
-        foreach ($trusted as $key => $value) {
-            $formFields[$key] = $value;
+        if (!$this->customerSession->isLoggedIn()) {
+            return;
         }
-        return $formFields;
-    }
 
-    private function extractTrustedFormFieldsFromBuyRequest($item): array
-    {
-        $trusted = [];
-        $buyRequestOption = $item->getOptionByCode('info_buyRequest');
-        if (!$buyRequestOption) {
-            return $trusted;
-        }
+        $customerId = (int) $this->customerSession->getCustomerId();
+        $productId  = (int) $item->getProductId();
 
         try {
-            $buyRequest = $this->serializer->unserialize((string)$buyRequestOption->getValue());
+            $this->projectManager->save(
+                $customerId,
+                $productId,
+                $saveToken,
+                $thumbnailUrl ?: null
+            );
         } catch (\Throwable $e) {
-            $this->logger->warning('Printess: unable to parse info_buyRequest for pricing checks', [
-                'error' => $e->getMessage()
-            ]);
-            return $trusted;
+            $this->logger->warning('Printess: project DB sync on cart add failed', ['error' => $e->getMessage()]);
         }
-
-        if (!is_array($buyRequest)) {
-            return $trusted;
-        }
-
-        $product = $item->getProduct();
-        $trusted = array_replace(
-            $trusted,
-            $this->extractTrustedCustomOptionFields($product, (array)($buyRequest['options'] ?? [])),
-            $this->extractTrustedVariantFields($product, (array)($buyRequest['super_attribute'] ?? []))
-        );
-
-        return $trusted;
-    }
-
-    private function extractTrustedCustomOptionFields(Product $product, array $selectedOptions): array
-    {
-        $trusted = [];
-
-        try {
-            foreach (($product->getOptions() ?: []) as $option) {
-                $optionType = $option->getType();
-                $optionId   = (string)$option->getOptionId();
-
-                if (!isset($selectedOptions[$optionId])) {
-                    continue;
-                }
-
-                if (in_array($optionType, ['drop_down', 'radio'], true)) {
-                    $selectedValueId = (string)$selectedOptions[$optionId];
-                    foreach ((array)$option->getValues() as $value) {
-                        if ((string)$value->getOptionTypeId() !== $selectedValueId) {
-                            continue;
-                        }
-                        $trusted[(string)$option->getTitle()] = (string)$value->getTitle();
-                        break;
-                    }
-                } elseif ($optionType === 'field') {
-                    // Text field options carry their raw submitted value directly.
-                    $trusted[(string)$option->getTitle()] = (string)$selectedOptions[$optionId];
-                }
-            }
-        } catch (\Throwable $e) {
-            $this->logger->warning('Printess: custom option pricing field extraction failed', [
-                'error' => $e->getMessage()
-            ]);
-        }
-
-        return $trusted;
-    }
-
-    private function extractTrustedVariantFields(Product $product, array $selectedSuperAttributes): array
-    {
-        $trusted = [];
-        if ($product->getTypeId() !== 'configurable') {
-            return $trusted;
-        }
-
-        try {
-            $typeInstance = $product->getTypeInstance();
-            foreach ($typeInstance->getConfigurableAttributes($product) as $cfgAttr) {
-                $attributeId = (string)$cfgAttr->getAttributeId();
-                if (!isset($selectedSuperAttributes[$attributeId])) {
-                    continue;
-                }
-                $selectedValueIndex = (string)$selectedSuperAttributes[$attributeId];
-                $productAttr = $cfgAttr->getProductAttribute();
-                if (!$productAttr) {
-                    continue;
-                }
-
-                foreach ((array)$cfgAttr->getOptions() as $option) {
-                    if ((string)($option['value_index'] ?? '') !== $selectedValueIndex) {
-                        continue;
-                    }
-                    $trusted[(string)$productAttr->getFrontendLabel()] = (string)($option['label'] ?? '');
-                    break;
-                }
-            }
-        } catch (\Throwable $e) {
-            $this->logger->warning('Printess: variant pricing field extraction failed', [
-                'error' => $e->getMessage()
-            ]);
-        }
-
-        return $trusted;
     }
 
     private function getParams(): array
