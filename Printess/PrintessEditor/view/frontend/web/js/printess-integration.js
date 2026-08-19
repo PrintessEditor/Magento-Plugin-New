@@ -418,6 +418,15 @@ define(['jquery'], function ($) {
         return fields;
     }
 
+    // Merges predefined (product-level) form fields with auto-detected variant/option fields.
+    // Auto-detected fields take precedence so that active Magento selections always win.
+    function mergePredefinedFormFields(predefined, auto) {
+        var map = {};
+        (predefined || []).forEach(function (ff) { if (ff.name) map[ff.name] = ff.value; });
+        (auto || []).forEach(function (ff) { if (ff.name) map[ff.name] = ff.value; });
+        return Object.keys(map).map(function (k) { return { name: k, value: map[k] }; });
+    }
+
     function findMatchingVariantAttr(variantOptions, fieldName, fieldLabel) {
         var nameLower = (fieldName || '').toLowerCase();
         var labelLower = (fieldLabel || '').toLowerCase();
@@ -1148,7 +1157,7 @@ define(['jquery'], function ($) {
             var panelCfg = {
                 shopToken: cfg.shopToken,
                 templateName: cfg.templateName,
-                formFields: buildAutoFormFields(variantOptions, customOptions),
+                formFields: mergePredefinedFormFields(cfg.predefinedFormFields, buildAutoFormFields(variantOptions, customOptions)),
                 variantOptions: variantOptions,
                 customOptions: customOptions,
                 theme: cfg.theme,
@@ -1216,7 +1225,7 @@ define(['jquery'], function ($) {
                     shopToken: cfg.shopToken,
                     templateName: cfg.templateName,
                     published: true,
-                    formFields: buildAutoFormFields(variantOptions, customOptions)
+                    formFields: mergePredefinedFormFields(cfg.predefinedFormFields, buildAutoFormFields(variantOptions, customOptions))
                 };
 
                 if (cfg.theme) slimCfg.theme = cfg.theme;

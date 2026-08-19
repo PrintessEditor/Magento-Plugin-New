@@ -30,6 +30,17 @@ $_magicPhotobookTheme = (string)($_product->getData('printess_magic_photobook_th
 $_pagePricing = json_encode($_product->getData('printess_page_pricing') ?: []);
 $_basePrice   = (float)$_product->getFinalPrice();
 
+// Predefined form fields: convert {fieldName, fieldValue} storage format to {name, value} for JS
+$_predefinedFormFields = json_encode(array_values(array_map(
+    static function (array $row): array {
+        return ['name' => (string)($row['fieldName'] ?? ''), 'value' => (string)($row['fieldValue'] ?? '')];
+    },
+    array_filter(
+        (array)($_product->getData('printess_form_fields') ?: []),
+        static function (array $row): bool { return trim((string)($row['fieldName'] ?? '')) !== ''; }
+    )
+)));
+
 // Auto variant sync: all configurable attributes, matched by label in JS
 $_variantOptions = [];
 if ($_product->getTypeId() === 'configurable') {
@@ -149,7 +160,8 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
         theme:               <?= /* @noEscape */ json_encode($_theme) ?>,
         magicPhotobookTheme: <?= /* @noEscape */ json_encode($_magicPhotobookTheme) ?>,
         printSettings:       <?= /* @noEscape */ json_encode($_printSettings) ?>,
-        mergeTemplate:       <?= /* @noEscape */ json_encode($_mergeTemplate) ?>
+        mergeTemplate:       <?= /* @noEscape */ json_encode($_mergeTemplate) ?>,
+        predefinedFormFields: <?= /* @noEscape */ $_predefinedFormFields ?>
     });
     document.getElementById('product-addtocart-button').addEventListener('click', function () {
         PrintessEditor.addToBasketFromSlim();
@@ -205,7 +217,8 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
             "theme": <?= /* @noEscape */ json_encode($_theme) ?>,
             "magicPhotobookTheme": <?= /* @noEscape */ json_encode($_magicPhotobookTheme) ?>,
             "printSettings": <?= /* @noEscape */ json_encode($_printSettings) ?>,
-            "mergeTemplate": <?= /* @noEscape */ json_encode($_mergeTemplate) ?>
+            "mergeTemplate": <?= /* @noEscape */ json_encode($_mergeTemplate) ?>,
+            "predefinedFormFields": <?= /* @noEscape */ $_predefinedFormFields ?>
         }
     }
 }

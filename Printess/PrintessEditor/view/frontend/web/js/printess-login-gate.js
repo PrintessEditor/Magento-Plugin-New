@@ -75,7 +75,8 @@ define([
                 productUrl: config.productUrl || '',
                 isLoggedIn: true,
                 projectId: config.projectId || null,
-                onShopLogin: function () { showLoginModal(config); }
+                onShopLogin: function () { showLoginModal(config); },
+                predefinedFormFields: config.predefinedFormFields || []
             });
         }, function () {
             clearPendingAction(config);

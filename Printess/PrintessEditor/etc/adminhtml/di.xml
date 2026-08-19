@@ -4,6 +4,10 @@
     <virtualType name="Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\Pool">
         <arguments>
             <argument name="modifiers" xsi:type="array">
+                <item name="printess_template_modifier" xsi:type="array">
+                    <item name="class" xsi:type="string">Printess\PrintessEditor\Ui\DataProvider\Product\Form\Modifier\PrintessTemplateModifier</item>
+                    <item name="sortOrder" xsi:type="number">195</item>
+                </item>
                 <item name="printess_theme_modifier" xsi:type="array">
                     <item name="class" xsi:type="string">Printess\PrintessEditor\Ui\DataProvider\Product\Form\Modifier\PrintessThemeModifier</item>
                     <item name="sortOrder" xsi:type="number">200</item>
@@ -11,6 +15,10 @@
                 <item name="printess_pricing_modifier" xsi:type="array">
                     <item name="class" xsi:type="string">Printess\PrintessEditor\Ui\DataProvider\Product\Form\Modifier\PrintessPricingModifier</item>
                     <item name="sortOrder" xsi:type="number">210</item>
+                </item>
+                <item name="printess_form_fields_modifier" xsi:type="array">
+                    <item name="class" xsi:type="string">Printess\PrintessEditor\Ui\DataProvider\Product\Form\Modifier\PrintessFormFieldsModifier</item>
+                    <item name="sortOrder" xsi:type="number">220</item>
                 </item>
             </argument>
         </arguments>
