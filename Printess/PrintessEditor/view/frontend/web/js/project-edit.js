@@ -20,7 +20,7 @@ define([
             theme: config.theme,
             magicPhotobookTheme: config.magicPhotobookTheme,
             printSettings: config.printSettings,
-            mergeTemplate: config.mergeTemplate,
+            mergeTemplates: config.mergeTemplates,
             shopUserId: config.shopUserId || '',
             productName: config.productName || '',
             productUrl: config.productUrl || '',

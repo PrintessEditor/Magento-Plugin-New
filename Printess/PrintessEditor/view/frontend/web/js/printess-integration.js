@@ -892,7 +892,7 @@ define(['jquery'], function ($) {
         if (opts.theme) loadCfg.theme = opts.theme;
         if (opts.magicPhotobookTheme) loadCfg.magicPhotobookTheme = opts.magicPhotobookTheme;
         if (opts.printSettings) loadCfg.printSettings = opts.printSettings;
-        if (opts.mergeTemplate) loadCfg.attach = { mergeTemplates: [{ templateName: opts.mergeTemplate }] };
+        if (opts.mergeTemplates && opts.mergeTemplates.length) loadCfg.attach = { mergeTemplates: opts.mergeTemplates };
         // Printess native save/load callbacks
         loadCfg.isShopUserLoggedInCallback = function () {
             var activeOpts = _activePanelOpts || opts;
@@ -1163,7 +1163,7 @@ define(['jquery'], function ($) {
                 theme: cfg.theme,
                 magicPhotobookTheme: cfg.magicPhotobookTheme,
                 printSettings: cfg.printSettings,
-                mergeTemplate: cfg.mergeTemplate,
+                mergeTemplates: cfg.mergeTemplates,
                 pagePricing: cfg.pagePricing || [],
                 currencyCode: cfg.currencyCode,
                 locale: cfg.locale,
@@ -1231,7 +1231,7 @@ define(['jquery'], function ($) {
                 if (cfg.theme) slimCfg.theme = cfg.theme;
                 if (cfg.magicPhotobookTheme) slimCfg.magicPhotobookTheme = cfg.magicPhotobookTheme;
                 if (cfg.printSettings) slimCfg.printSettings = cfg.printSettings;
-                if (cfg.mergeTemplate) slimCfg.attach = { mergeTemplates: [{ templateName: cfg.mergeTemplate }] };
+                if (cfg.mergeTemplates && cfg.mergeTemplates.length) slimCfg.attach = { mergeTemplates: cfg.mergeTemplates };
 
                 if (variantOptions.length || customOptions.length) {
                     slimCfg.formFieldChangedCallback = function (fieldName, value, tag, fieldLabel) {

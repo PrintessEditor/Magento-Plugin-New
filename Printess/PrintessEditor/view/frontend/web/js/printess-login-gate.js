@@ -68,7 +68,7 @@ define([
                 theme: config.theme,
                 magicPhotobookTheme: config.magicPhotobookTheme,
                 printSettings: config.printSettings,
-                mergeTemplate: config.mergeTemplate,
+                mergeTemplates: config.mergeTemplates,
                 shopUserId: config.shopUserId || '',
                 productId: config.productId || '',
                 productName: config.productName || '',
