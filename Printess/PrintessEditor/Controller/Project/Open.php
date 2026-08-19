@@ -100,7 +100,17 @@ class Open extends Action implements HttpPostActionInterface
                     'theme' => (string) ($product->getData('printess_theme') ?: $this->printessConfig->getEditorTheme()),
                     'magicPhotobookTheme' => (string) ($product->getData('printess_magic_photobook_theme') ?: ''),
                     'printSettings' => (string) ($product->getData('printess_print_settings') ?: $this->printessConfig->getPrintSettings()),
-                    'mergeTemplate' => (string) ($product->getData('printess_merge_template') ?: '')
+                    'mergeTemplates' => array_values(array_map(
+                        static function (array $r): array {
+                            $entry = ['templateName' => (string)($r['mergeTemplate'] ?? '')];
+                            if (($r['mergeMode'] ?? '') !== '') { $entry['mergeMode'] = (string)$r['mergeMode']; }
+                            return $entry;
+                        },
+                        array_filter(
+                            (array) ($product->getData('printess_merge_template') ?: []),
+                            static fn($r): bool => is_array($r) && trim((string)($r['mergeTemplate'] ?? '')) !== ''
+                        )
+                    ))
                 ]
             ]);
         } catch (LocalizedException $exception) {
