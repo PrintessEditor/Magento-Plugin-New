@@ -11,6 +11,7 @@ define(['jquery'], function ($) {
     var _panelLoaderPromise = null;
     var _slimApi = null;   // slim UI instance
     var _slimFormId = null;   // form to submit on "Add to Basket"
+    var _slimOriginalCfg = null;   // full initSlimUi() cfg, kept so we can relaunch the panel editor with the same options
     var _panelEditorRef = null;   // active panel editor reference
     var _panelHistoryPushed = false;  // true while editor history state is on the stack
     var _currentPageCount = 0;      // last page count reported by priceChangeCallback
@@ -1199,6 +1200,7 @@ define(['jquery'], function ($) {
          * should then call addToBasketFromSlim().
          */
         initSlimUi: function (cfg) {
+            _slimOriginalCfg = cfg;
             _currentTemplateName = cfg.templateName || '';
             _currentShopToken = cfg.shopToken || '';
             _slimFormId = cfg.formId || 'product_addtocart_form';
@@ -1336,6 +1338,64 @@ define(['jquery'], function ($) {
                 );
             }).catch(function (err) {
                 console.error('Printess: createSaveToken failed', err);
+            });
+        },
+
+        /**
+         * Slim UI — "Switch to Full Editor" button. Snapshots the customer's current
+         * in-progress Slim UI document via createSaveToken() (the same call used by
+         * addToBasketFromSlim), then reopens that snapshot in the Panel editor — the
+         * same save-token-as-template technique openFromCart() already uses to reopen
+         * a cart item. On save, the flow rejoins the normal add-to-cart path.
+         */
+        openFullEditorFromSlim: function () {
+            if (!_slimApi) {
+                console.error('Printess: Slim UI not ready');
+                return;
+            }
+
+            var cfg = _slimOriginalCfg || {};
+            var variantOptions = cfg.variantOptions || [];
+            var customOptions = cfg.customOptions || [];
+
+            showCartLoader('Loading Full Editor...');
+
+            _slimApi.createSaveToken().then(function (data) {
+                hideCartLoader();
+
+                openPanelEditor({
+                    shopToken: cfg.shopToken || _currentShopToken,
+                    templateName: data.saveToken,
+                    variantOptions: variantOptions,
+                    customOptions: customOptions,
+                    theme: cfg.theme,
+                    magicPhotobookTheme: cfg.magicPhotobookTheme,
+                    printSettings: cfg.printSettings,
+                    mergeTemplates: cfg.mergeTemplates,
+                    pagePricing: cfg.pagePricing || [],
+                    basePrice: cfg.basePrice || 0,
+                    currencyCode: cfg.currencyCode,
+                    locale: cfg.locale,
+                    isLoggedIn: true,
+                    onAddToBasket: function (saveToken, thumbnailUrl, apiRef) {
+                        var form = getOrCreateCartForm({
+                            formId: cfg.formId || 'product_addtocart_form',
+                            addToCartUrl: cfg.addToCartUrl || '',
+                            productId: cfg.productId || '',
+                            formKey: cfg.formKey || ''
+                        });
+                        if (!form) {
+                            console.error('Printess: add-to-cart form not found');
+                            throw new Error('form not found');
+                        }
+                        showCartLoader('Adding to Cart...');
+                        return postFormToCart(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef);
+                    }
+                });
+            }).catch(function (err) {
+                hideCartLoader();
+                console.error('Printess: could not switch to full editor', err);
+                alert('Could not open the full editor. Please try again.');
             });
         },
 

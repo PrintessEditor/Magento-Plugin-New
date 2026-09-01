@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Loads the admin CSS that lays the Slim UI / Full Editor toggles out side by side.
+ * Targets the "catalog_product_new" handle so it merges with core's own layout file of
+ * the same name; "catalog_product_edit" updates that handle, so this also covers the
+ * edit page.
+ */
+-->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <head>
+        <css src="Printess_PrintessEditor::css/admin-product-form.css"/>
+    </head>
+</page>

@@ -12,6 +12,10 @@
                     <item name="class" xsi:type="string">Printess\PrintessEditor\Ui\DataProvider\Product\Form\Modifier\PrintessThemeModifier</item>
                     <item name="sortOrder" xsi:type="number">200</item>
                 </item>
+                <item name="printess_slim_ui_full_editor_modifier" xsi:type="array">
+                    <item name="class" xsi:type="string">Printess\PrintessEditor\Ui\DataProvider\Product\Form\Modifier\PrintessSlimUiFullEditorModifier</item>
+                    <item name="sortOrder" xsi:type="number">205</item>
+                </item>
                 <item name="printess_pricing_modifier" xsi:type="array">
                     <item name="class" xsi:type="string">Printess\PrintessEditor\Ui\DataProvider\Product\Form\Modifier\PrintessPricingModifier</item>
                     <item name="sortOrder" xsi:type="number">210</item>
