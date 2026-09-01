@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <!--
+            additional.product.info is a single shared block, scoped to this page only,
+            that Magento_Sales's order item renderer calls once per row via
+            setItem($item)->toHtml() (see Magento_Sales::order/items/renderer/default.phtml).
+            Redeclaring class+template here (rather than only overriding the template) swaps
+            in our own block for the per-item "Edit & Reorder" action, without touching the
+            renderer template itself or affecting any other page that reuses this block name
+            (cart, print view, order emails each declare their own separate instance).
+        -->
+        <referenceBlock name="additional.product.info"
+                         class="Printess\PrintessEditor\Block\Order\ReorderButton"
+                         template="Printess_PrintessEditor::order/item/reorder-button.phtml"/>
+    </body>
+</page>

@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace Printess\PrintessEditor\Ui\DataProvider\Product\Form\Modifier;
 
+use Magento\Backend\Model\UrlInterface;
 use Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\AbstractModifier;
 use Magento\Framework\Stdlib\ArrayManager;
 
 class PrintessFormFieldsModifier extends AbstractModifier
 {
-    public function __construct(private readonly ArrayManager $arrayManager) {}
+    public function __construct(
+        private readonly ArrayManager $arrayManager,
+        private readonly UrlInterface $backendUrl
+    ) {}
 
     public function modifyData(array $data): array
     {
@@ -33,84 +37,22 @@ class PrintessFormFieldsModifier extends AbstractModifier
             return $meta;
         }
 
-        $meta = $this->arrayManager->set($path, $meta, [
-            'arguments' => [
-                'data' => [
-                    'config' => [
-                        'componentType'       => 'dynamicRows',
-                        'label'               => __('Predefined Form Fields'),
-                        'scopeLabel'          => __('[STORE VIEW]'),
-                        'renderDefaultRecord' => false,
-                        'recordTemplate'      => 'record',
-                        'dndConfig'           => ['enabled' => false],
-                        'additionalClasses'   => 'admin__field-wide',
-                        'notice'              => __(
-                            'Form field name/value pairs passed to the Printess editor when the product is opened. '
-                            . 'These are static product-level defaults; values driven by variant or custom option selections are merged on top.'
-                        ),
-                    ],
-                ],
-            ],
-            'children' => [
-                'record' => [
-                    'arguments' => [
-                        'data' => [
-                            'config' => [
-                                'componentType' => 'container',
-                                'isTemplate'    => true,
-                                'is_collection' => true,
-                                'headerLabel'   => '',
-                            ],
-                        ],
-                    ],
-                    'children' => [
-                        'fieldName' => [
-                            'arguments' => [
-                                'data' => [
-                                    'config' => [
-                                        'componentType' => 'field',
-                                        'formElement'   => 'input',
-                                        'dataType'      => 'text',
-                                        'label'         => __('Form Field Name'),
-                                        'dataScope'     => 'fieldName',
-                                        'sortOrder'     => 10,
-                                        'fit'           => false,
-                                        'validation'    => ['required-entry' => true],
-                                    ],
-                                ],
-                            ],
-                        ],
-                        'fieldValue' => [
-                            'arguments' => [
-                                'data' => [
-                                    'config' => [
-                                        'componentType' => 'field',
-                                        'formElement'   => 'input',
-                                        'dataType'      => 'text',
-                                        'label'         => __('Value'),
-                                        'dataScope'     => 'fieldValue',
-                                        'sortOrder'     => 20,
-                                        'fit'           => false,
-                                    ],
-                                ],
-                            ],
-                        ],
-                        'actionDelete' => [
-                            'arguments' => [
-                                'data' => [
-                                    'config' => [
-                                        'componentType' => 'actionDelete',
-                                        'label'         => '',
-                                        'sortOrder'     => 30,
-                                        'fit'           => true,
-                                    ],
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-            ],
-        ]);
+        $meta = $this->arrayManager->merge(
+            $path . '/arguments/data/config',
+            $meta,
+            [
+                'componentType'      => 'field',
+                'formElement'        => 'input',
+                'component'          => 'Printess_PrintessEditor/js/product/form/element/form-fields-editor',
+                'elementTmpl'        => 'Printess_PrintessEditor/product/form/element/form-fields-editor',
+                'endpointFormFields' => $this->backendUrl->getUrl('printess/api/formfields'),
+                'additionalClasses'  => 'admin__field-wide',
+                'notice'             => __(
+                    'Form field name/value pairs passed to the Printess editor when the product is opened. '
+                    . 'These are static product-level defaults; values driven by variant or custom option selections are merged on top.'
+                ),
+            ]
+        );
 
         return $meta;
     }
