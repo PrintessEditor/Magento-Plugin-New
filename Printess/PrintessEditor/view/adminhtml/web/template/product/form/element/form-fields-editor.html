@@ -1,0 +1,76 @@
+<style>
+.pff-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:6px}
+.pff-col-name{flex:1;min-width:0}
+.pff-col-value{flex:1;min-width:0}
+.pff-col-del{flex:0 0 auto}
+.pff-col-label{font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px}
+.pff-status{font-size:12px;color:#888;margin-bottom:6px}
+.pff-err{font-size:12px;color:#c00;margin-bottom:6px}
+.pff-col-del button{padding:5px 10px;background:#f0f0f0;border:1px solid #bbb;border-radius:3px;cursor:pointer;font-size:14px;line-height:1;color:#555}
+.pff-col-del button:hover{background:#e0e0e0;color:#333}
+</style>
+
+<!-- ko if: loadingFields() -->
+<div class="pff-status">Loading form fields from Printess&hellip;</div>
+<!-- /ko -->
+<!-- ko if: !loadingFields() && fieldsError() -->
+<div class="pff-err" data-bind="text: fieldsError"></div>
+<!-- /ko -->
+
+<!-- ko if: rows().length -->
+<div class="pff-row">
+    <div class="pff-col-name"><span class="pff-col-label">Field Name</span></div>
+    <div class="pff-col-value"><span class="pff-col-label">Value</span></div>
+    <div class="pff-col-del"></div>
+</div>
+<!-- /ko -->
+
+<!-- ko foreach: rows() -->
+<div class="pff-row">
+    <div class="pff-col-name">
+        <!-- ko if: $parent.availableFields().length -->
+        <select class="admin__control-select"
+                data-bind="value: fieldName,
+                           options: $parent.availableFieldOptions(),
+                           optionsValue: 'value',
+                           optionsText: 'label'">
+        </select>
+        <!-- /ko -->
+        <!-- ko ifnot: $parent.availableFields().length -->
+        <input type="text" class="admin__control-text"
+               placeholder="Form field name"
+               data-bind="value: fieldName, valueUpdate: 'input'"/>
+        <!-- /ko -->
+    </div>
+    <div class="pff-col-value">
+        <!-- ko if: entries().length -->
+        <select class="admin__control-select"
+                data-bind="value: fieldValue,
+                           options: entries(),
+                           optionsValue: 'key',
+                           optionsText: 'displayLabel',
+                           optionsCaption: '-- Select value --'">
+        </select>
+        <!-- /ko -->
+        <!-- ko ifnot: entries().length -->
+        <input type="text" class="admin__control-text"
+               placeholder="Value"
+               data-bind="value: fieldValue, valueUpdate: 'input'"/>
+        <!-- /ko -->
+    </div>
+    <div class="pff-col-del">
+        <button type="button"
+                title="Remove"
+                data-bind="click: function() { $parent.removeRow($index()); }">
+            &times;
+        </button>
+    </div>
+</div>
+<!-- /ko -->
+
+<button type="button"
+        class="action-secondary scalable"
+        style="margin-top:6px"
+        data-bind="click: addRow">
+    <span>Add Form Field</span>
+</button>

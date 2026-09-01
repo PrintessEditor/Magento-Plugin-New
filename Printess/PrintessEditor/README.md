@@ -77,6 +77,7 @@ php bin/magento cache:flush
 |---|---|
 | `printess_template` | Printess template name (required to enable editor) |
 | `printess_slim_ui` | Enable Slim UI instead of Panel UI |
+| `printess_slim_ui_full_editor` | Adds a "Switch to Full Editor" button on Slim UI products, letting the customer continue in the fullscreen Panel editor. No effect unless Slim UI is enabled. Default off. |
 | `printess_product_btn_label` | Custom label for the Personalise button |
 | `printess_theme` | Per-product theme override |
 | `printess_print_settings` | Per-product print settings override |

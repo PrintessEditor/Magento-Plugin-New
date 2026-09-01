@@ -23,6 +23,7 @@ $_mergeTemplates = json_encode(array_values(array_map(
 $_shopToken = $_config->getShopToken();
 $_isSlimUi  = $_template !== '' && $_shopToken !== '' && (bool)$_product->getData('printess_slim_ui');
 $_isPrintess = $_template !== '' && $_shopToken !== '' && !$_isSlimUi;
+$_slimUiFullEditorAllowed = $_isSlimUi && (bool)$_product->getData('printess_slim_ui_full_editor');
 $_buttonLabel = trim((string)($_product->getData('printess_product_btn_label') ?? '')) ?: (string)__('Personalise');
 
 // Editor theme: product-level overrides shop-level
@@ -144,6 +145,15 @@ try {
                             class="action primary tocart">
                         <span><?= $block->escapeHtml(__('Add to Basket')) ?></span>
                     </button>
+                    <?php if ($_slimUiFullEditorAllowed) : ?>
+                    <button type="button"
+                            id="printess-full-editor-button"
+                            title="<?= $block->escapeHtmlAttr(__('Switch to Full Editor')) ?>"
+                            class="action secondary"
+                            style="margin-top:8px;width:100%;">
+                        <span><?= $block->escapeHtml(__('Switch to Full Editor')) ?></span>
+                    </button>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -176,6 +186,11 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
     document.getElementById('product-addtocart-button').addEventListener('click', function () {
         PrintessEditor.addToBasketFromSlim();
     });
+    <?php if ($_slimUiFullEditorAllowed) : ?>
+    document.getElementById('printess-full-editor-button').addEventListener('click', function () {
+        PrintessEditor.openFullEditorFromSlim();
+    });
+    <?php endif; ?>
 });
 </script>
 
