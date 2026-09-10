@@ -43,7 +43,8 @@ class ProducePdf
         private readonly Filesystem $filesystem,
         private readonly LockManagerInterface $lockManager,
         private readonly LoggerInterface $logger
-    ) {}
+    ) {
+    }
 
     public function execute(): void
     {
@@ -207,13 +208,31 @@ class ProducePdf
 
     private function savePdf(string $pdfUrl, int $orderId, int $itemId): string
     {
+        // Only allow https:// downloads to var/.
+        if (!str_starts_with(strtolower($pdfUrl), 'https://')) {
+            throw new \RuntimeException('Refusing to download PDF from non-HTTPS URL: ' . $pdfUrl);
+        }
+
         $varDir   = $this->filesystem->getDirectoryWrite(DirectoryList::VAR_DIR);
         $dir      = 'printess/order_' . $orderId;
         $filePath = $dir . '/item_' . $itemId . '.pdf';
 
         $varDir->create($dir);
 
-        $content = @file_get_contents($pdfUrl);
+        $ctx = stream_context_create([
+            'http' => ['timeout' => 60],
+            'ssl'  => ['verify_peer' => true, 'verify_peer_name' => true],
+        ]);
+
+        set_error_handler(static function (int $errno, string $errstr) use ($pdfUrl): never {
+            throw new \RuntimeException('Could not download PDF from ' . $pdfUrl . ': ' . $errstr, $errno);
+        });
+        try {
+            $content = file_get_contents($pdfUrl, false, $ctx);
+        } finally {
+            restore_error_handler();
+        }
+
         if ($content === false) {
             throw new \RuntimeException('Could not download PDF from ' . $pdfUrl);
         }

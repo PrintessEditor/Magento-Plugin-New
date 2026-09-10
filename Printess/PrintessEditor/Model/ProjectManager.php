@@ -22,7 +22,8 @@ class ProjectManager
         private readonly TimezoneInterface $timezone,
         private readonly ProjectConfig $projectConfig,
         private readonly StoreManagerInterface $storeManager,
-        private readonly DateTime $dateTime
+        private readonly DateTime $dateTime,
+        private readonly ThumbnailUrlValidator $thumbnailUrlValidator
     ) {
     }
 
@@ -151,19 +152,6 @@ class ProjectManager
 
     private function validateThumbnailUrl(?string $thumbnailUrl): ?string
     {
-        $thumbnailUrl = trim((string) $thumbnailUrl);
-
-        // The Printess SDK may pass action signals (e.g. "close") as the thumbnail
-        // argument rather than a real URL. Treat anything that isn't an HTTPS URL
-        // as absent — never fail the save because of an invalid thumbnail.
-        if ($thumbnailUrl === '' || !str_starts_with(strtolower($thumbnailUrl), 'https://')) {
-            return null;
-        }
-
-        if (mb_strlen($thumbnailUrl) > 2048 || filter_var($thumbnailUrl, FILTER_VALIDATE_URL) === false) {
-            return null;
-        }
-
-        return $thumbnailUrl;
+        return $this->thumbnailUrlValidator->validate($thumbnailUrl);
     }
 }

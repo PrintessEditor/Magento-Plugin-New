@@ -89,6 +89,64 @@
                     <comment>Maximum reminders sent by each cron run.</comment>
                 </field>
             </group>
+            <group id="project_name" translate="label" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Project Names</label>
+                <field id="enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Save Project Name Popup</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Show a popup asking the customer to name their project when saving for the first time.</comment>
+                </field>
+                <field id="prompt_text" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Save Popup Text</label>
+                    <comment>The descriptive text shown inside the save project name popup.</comment>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+                <field id="placeholder" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Save Popup Placeholder</label>
+                    <comment>Placeholder text shown inside the project name input field.</comment>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+                <field id="action_label" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Save Popup Action Label</label>
+                    <comment>Label for the save/confirm button inside the popup.</comment>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+            </group>
+            <group id="login_popup" translate="label" type="text" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Login Popup Headings</label>
+                <comment>Text shown in the authentication popup when a guest clicks the Personalise button.</comment>
+                <field id="new_customer_heading" translate="label comment" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>New Customer Heading</label>
+                    <comment>Overrides the "New Customers" heading in the registration panel. Leave blank to use the default theme text.</comment>
+                </field>
+                <field id="customer_login_heading" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Customer Login Heading</label>
+                    <comment>Overrides the "Registered Customers" heading in the login panel. Leave blank to use the default theme text.</comment>
+                </field>
+            </group>
+            <group id="display" translate="label" type="text" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Friendly Option Display</label>
+                <field id="friendly_option_labels" translate="label comment" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Friendly Option Labels</label>
+                    <frontend_model>Printess\PrintessEditor\Block\Adminhtml\Form\Field\FriendlyOptionLabelRule</frontend_model>
+                    <backend_model>Magento\Config\Model\Config\Backend\Serialized\ArraySerialized</backend_model>
+                    <comment>
+                        Override how raw product option labels/values are displayed in cart, checkout and order
+                        emails, without changing the underlying option data. Leave "Option Value" blank to relabel
+                        the option itself (e.g. DOCUMENT_SIZE -&gt; Document Size); fill it in to relabel one
+                        specific value of that option (e.g. COVER_TYPE / HC -&gt; Hard Cover).
+                    </comment>
+                </field>
+            </group>
+            <group id="debug" translate="label" type="text" sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Debug</label>
+                <field id="enabled_logging" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Logging</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Log Printess pricing and token activity to var/log/debug.log.</comment>
+                </field>
+            </group>
         </section>
     </system>
 </config>

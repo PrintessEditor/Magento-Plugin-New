@@ -9,7 +9,9 @@ use Magento\Framework\Stdlib\ArrayManager;
 
 class PrintessPricingModifier extends AbstractModifier
 {
-    public function __construct(private readonly ArrayManager $arrayManager) {}
+    public function __construct(private readonly ArrayManager $arrayManager)
+    {
+    }
 
     public function modifyData(array $data): array
     {

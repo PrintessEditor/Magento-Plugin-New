@@ -43,14 +43,28 @@ class PrintessApi
         return $result->jobId;
     }
 
-    /**
-     * Returns the raw status object for a production job.
-     * Unlike pollUntilDone() this makes exactly ONE request — suitable for use in a cron job
-     * where the caller is responsible for retrying on the next cron run.
-     */
     public function getJobStatus(string $jobId): object
     {
         return $this->post('/production/status/get', ['jobId' => $jobId]);
+    }
+
+    /**
+     * Fetch verified book info for a saved design.
+     *
+     * Returns an associative array with:
+     *   - inside.pageCount          (int)   current page count in the design
+     *   - inside.minimumSpreadCount (int)   template minimum spreads → minPages = spreads*2-2
+     *   - formFieldData.formFields  (array) saved form field values
+     *
+     * @param  string $saveToken  The st:... token from the Printess editor
+     * @return array              Decoded response as a nested array
+     * @throws \RuntimeException  On API or network failure
+     */
+    public function bookInfo(string $saveToken): array
+    {
+        $result = $this->post('/book/info', ['saveToken' => $saveToken]);
+        // Convert stdClass tree to plain array
+        return json_decode(json_encode($result), true) ?: [];
     }
 
     /**
@@ -106,10 +120,19 @@ class PrintessApi
             ],
         ]);
 
-        $response = @file_get_contents($url, false, $ctx);
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction -- file_get_contents is the appropriate
+        // method here; error suppression replaced with set_error_handler to capture network failures.
+        set_error_handler(static function (int $errno, string $errstr) use ($url): never {
+            throw new \RuntimeException('Printess API request to ' . $url . ' failed: ' . $errstr, $errno);
+        });
+        try {
+            $response = file_get_contents($url, false, $ctx);
+        } finally {
+            restore_error_handler();
+        }
 
         if ($response === false) {
-            throw new \RuntimeException('Printess API request to ' . $path . ' failed (network error)');
+            throw new \RuntimeException('Printess API request to ' . $url . ' failed (network error)');
         }
 
         // Check HTTP status from response headers

@@ -8,4 +8,38 @@
         <plugin name="printess_hide_internal_options"
                 type="Printess\PrintessEditor\Plugin\Helper\ProductConfigurationPlugin"/>
     </type>
+    <!--
+        Order emails and the customer account order-view page read order item options via
+        these two blocks directly (Order\Item::getProductOptions()['additional_options']),
+        bypassing Magento\Catalog\Helper\Product\Configuration entirely — so the cart-only
+        ProductConfigurationPlugin above never filters them. Without this, every
+        Printess-internal key (save token, project id, thumbnail, base price, included
+        pages) is shown verbatim to the customer in the order confirmation email and order
+        view. Admin order view intentionally keeps full visibility for support purposes.
+
+        Registered globally (not etc/frontend/di.xml): order emails can be rendered outside
+        the frontend area (e.g. via the sales_send_order_emails cron, or when resent from
+        admin), so an area-scoped plugin would silently not apply in those cases.
+    -->
+    <type name="Magento\Sales\Block\Order\Email\Items\Order\DefaultOrder">
+        <plugin name="printess_hide_internal_options_email"
+                type="Printess\PrintessEditor\Plugin\Sales\OrderItemOptionsPlugin"/>
+    </type>
+    <type name="Magento\Sales\Block\Order\Item\Renderer\DefaultRenderer">
+        <plugin name="printess_hide_internal_options_order_view"
+                type="Printess\PrintessEditor\Plugin\Sales\OrderItemOptionsPlugin"/>
+    </type>
+    <!--
+        Invoice, shipment and credit-memo confirmation emails render their line items
+        through Email\Items\DefaultItems (not DefaultOrder, which it does not extend), so
+        the plugin above does not reach them. Without this registration the same
+        Printess-internal keys leak into those transactional emails. The plugin filters by
+        the "printess_" key prefix only, so it strips nothing else and composes safely with
+        Affinity\ProductCustomOptionHidden's plugin already on this block.
+    -->
+    <type name="Magento\Sales\Block\Order\Email\Items\DefaultItems">
+        <plugin name="printess_hide_internal_options_email_docs"
+                type="Printess\PrintessEditor\Plugin\Sales\OrderItemOptionsPlugin"/>
+    </type>
+
 </config>

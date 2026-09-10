@@ -2,7 +2,7 @@
  * Printess Editor integration for Magento.
  * Supports both Panel UI (fullscreen) and Slim UI (inline).
  */
-define(['jquery'], function ($) {
+define(['jquery', 'mage/url'], function ($, mageUrl) {
     'use strict';
 
     var PANEL_LOADER_URL = 'https://editor.printess.com/printess-editor/loader.js';
@@ -23,6 +23,7 @@ define(['jquery'], function ($) {
     var _selectedOptionPrices = {};  // optionId -> price of currently selected value (used when no Magento price box)
     var _activePanelOpts = null;     // mutable ref to the current panel config — callbacks read from this so re-opening a different project works correctly
     var _panelLoadedTemplate = '';   // save token currently loaded in the persistent editor instance
+    var _namePromptConfig    = {};   // save-project-name popup config from system config
 
     var _cartLoaderOverlay = null;
 
@@ -68,9 +69,14 @@ define(['jquery'], function ($) {
      * Uses printess-owned class so the Printess CSS doesn't hide it.
      */
     function promptProjectName(existingName) {
-        if (existingName && existingName.trim() !== '') {
+        if (!_namePromptConfig.enabled || (existingName && existingName.trim() !== '')) {
             return Promise.resolve('');
         }
+
+        var promptText   = esc(_namePromptConfig.text        || 'Give this project a name so you can manage it later.');
+        var placeholder  = esc(_namePromptConfig.placeholder  || 'e.g. My Wedding Album');
+        var actionLabel  = esc(_namePromptConfig.actionLabel  || 'Save name');
+
         return new Promise(function (resolve) {
             var overlay = document.createElement('div');
             overlay.className = 'printess-owned';
@@ -84,17 +90,15 @@ define(['jquery'], function ($) {
                 '<div style="background:#fff;border-radius:8px;padding:32px;width:380px;max-width:90vw;' +
                 'box-shadow:0 8px 32px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;">' +
                   '<h3 style="margin:0 0 8px;font-size:18px;font-weight:600;color:#1a1a1a;">Name your project</h3>' +
-                  '<p style="margin:0 0 20px;font-size:14px;color:#555;">Give this design a name so you can find it easily later.</p>' +
-                  '<input id="printess-project-name-input" type="text" maxlength="255" placeholder="e.g. My Wedding Album"' +
+                  '<p style="margin:0 0 20px;font-size:14px;color:#555;">' + promptText + '</p>' +
+                  '<input id="printess-project-name-input" type="text" maxlength="255" placeholder="' + placeholder + '"' +
                   ' style="width:100%;box-sizing:border-box;padding:10px 12px;font-size:15px;border:1px solid #ccc;' +
                   'border-radius:5px;outline:none;margin-bottom:20px;" />' +
                   '<div style="display:flex;gap:12px;justify-content:flex-end;">' +
-                    '<button id="printess-name-skip" style="padding:9px 20px;border:1px solid #ccc;background:#fff;' +
-                    'border-radius:5px;font-size:14px;cursor:pointer;color:#555;">Skip</button>' +
-                    '<button id="printess-name-save" style="padding:9px 20px;background:#1a73e8;color:#fff;border:none;' +
-                    'border-radius:5px;font-size:14px;font-weight:600;cursor:pointer;">Save name</button>' +
+                    '<button id="printess-name-skip" class="action">Skip</button>' +
+                    '<button id="printess-name-save" class="action primary">' + actionLabel + '</button>' +
                   '</div>' +
-                '</div>';
+                '</div>';        
 
             document.body.appendChild(overlay);
 
@@ -432,7 +436,22 @@ define(['jquery'], function ($) {
 
     function getPanelLoader() {
         if (!_panelLoaderPromise) {
-            _panelLoaderPromise = import(PANEL_LOADER_URL);
+            // The Printess SDK bundles Preact which uses an anonymous define() call.
+            // RequireJS intercepts this and throws "Mismatched anonymous define" when
+            // the SDK is loaded via native import(). Temporarily detach RequireJS's
+            // global define so the SDK loads cleanly, then restore it afterwards.
+            var savedDefine = window.define;
+            window.define = undefined;
+            _panelLoaderPromise = import(PANEL_LOADER_URL).then(
+                function (mod) {
+                    window.define = savedDefine;
+                    return mod;
+                },
+                function (err) {
+                    window.define = savedDefine;
+                    return Promise.reject(err);
+                }
+            );
         }
         return _panelLoaderPromise;
     }
@@ -546,36 +565,52 @@ define(['jquery'], function ($) {
     }
 
     // Read the current Magento final price from the product page price box.
-    // Magento's price-box widget updates data-price-amount synchronously when a
-    // custom option or configurable attribute change event fires.
+    // Read the Magento product page price box.
+    // On the product page (.product-info-main present) we read the live price-box
+    // widget so that synchronous Magento custom-option price recalculations are
+    // picked up immediately when setCustomOptionInMagento fires a 'change' event.
+    // On the cart / account page (.product-info-main absent) we skip the DOM read
+    // entirely to avoid picking up stale cart-row [data-role="priceBox"] elements,
+    // and fall straight through to fallback + computeOptionUpcharge().
     function readMagentoFinalPrice(fallback) {
-        var box = document.querySelector('.product-info-main [data-role="priceBox"], [data-role="priceBox"]');
-        if (box && window.jQuery) {
-            var $box = window.jQuery(box);
-            try {
-                var widget = $box.data('magePriceBox') || $box.data('mage-priceBox');
-                var display = widget && widget.cache && widget.cache.displayPrices && widget.cache.displayPrices.finalPrice;
-                if (display) {
-                    var finalAmount = parseFloat(typeof display.final !== 'undefined' ? display.final : display.amount);
-                    if (!isNaN(finalAmount) && finalAmount > 0) return finalAmount;
-                }
-                if ($box.priceBox && $box.priceBox('option') && $box.priceBox('option').prices) {
-                    var optPrices = $box.priceBox('option').prices;
-                    if (optPrices.finalPrice && typeof optPrices.finalPrice.amount !== 'undefined') {
-                        var optAmount = parseFloat(optPrices.finalPrice.amount);
-                        if (!isNaN(optAmount) && optAmount > 0) return optAmount;
+        var onProductPage = !!document.querySelector('.product-info-main');
+        // When the editor is opened for a grouped-product child, the standard
+        // Magento price box belongs to the *parent* grouped product and never
+        // reflects child custom-option changes.  Skip the DOM read and rely on
+        // fallback + computeOptionUpcharge() instead.
+        var bypassDom = _activePanelOpts && _activePanelOpts.bypassMagentoPriceBox;
+        if (onProductPage && !bypassDom) {
+            // Prefer the scoped selector; fall back to any price box on the page.
+            var box = document.querySelector('.product-info-main [data-role="priceBox"]')
+                   || document.querySelector('[data-role="priceBox"]');
+            if (box && window.jQuery) {
+                var $box = window.jQuery(box);
+                try {
+                    var widget = $box.data('magePriceBox') || $box.data('mage-priceBox');
+                    var display = widget && widget.cache && widget.cache.displayPrices && widget.cache.displayPrices.finalPrice;
+                    if (display) {
+                        var finalAmount = parseFloat(typeof display.final !== 'undefined' ? display.final : display.amount);
+                        if (!isNaN(finalAmount) && finalAmount > 0) return finalAmount;
                     }
-                }
-            } catch (e) { }
+                    if ($box.priceBox && $box.priceBox('option') && $box.priceBox('option').prices) {
+                        var optPrices = $box.priceBox('option').prices;
+                        if (optPrices.finalPrice && typeof optPrices.finalPrice.amount !== 'undefined') {
+                            var optAmount = parseFloat(optPrices.finalPrice.amount);
+                            if (!isNaN(optAmount) && optAmount > 0) return optAmount;
+                        }
+                    }
+                } catch (e) { }
+            }
+            var el = document.querySelector('.product-info-main [data-price-type="finalPrice"]')
+                  || document.querySelector('[data-price-type="finalPrice"]');
+            if (el) {
+                var attrAmount = parseFloat(el.getAttribute('data-price-amount'));
+                if (!isNaN(attrAmount) && attrAmount > 0) return attrAmount;
+                var textAmount = parseFloat(String(el.textContent || '').replace(/[^0-9.,-]/g, '').replace(',', '.'));
+                if (!isNaN(textAmount) && textAmount > 0) return textAmount;
+            }
         }
-
-        var el = document.querySelector('.product-info-main [data-price-type="finalPrice"], [data-role="priceBox"] [data-price-type="finalPrice"]');
-        if (el) {
-            var attrAmount = parseFloat(el.getAttribute('data-price-amount'));
-            if (!isNaN(attrAmount) && attrAmount > 0) return attrAmount;
-            var textAmount = parseFloat(String(el.textContent || '').replace(/[^0-9.,-]/g, '').replace(',', '.'));
-            if (!isNaN(textAmount) && textAmount > 0) return textAmount;
-        }
+        // Not on product page, or price-box read failed: use option upcharge fallback.
         return fallback + computeOptionUpcharge();
     }
 
@@ -590,10 +625,11 @@ define(['jquery'], function ($) {
                 0
             );
             _currentPageCount = pageCount;
-            if (!_minPagesResolved && pageCount > 0) {
-                _minPages = pageCount;
-                _minPagesResolved = true;
-            }
+            // Do NOT set _minPages here. _minPages is authoritative only from
+            // resolveMinPagesFromApi (template API) or opts.minPages (cart-edit stored value).
+            // For this product pricing model, pricePerPage applies to ALL pages so _minPages
+            // stays at 0. Setting _minPages=pageCount on first fire would make billablePages=0
+            // and freeze the displayed price at the catalog base.
 
             if (data && typeof data === 'object' && data.priceRelevantFormFields) {
                 Object.keys(data.priceRelevantFormFields).forEach(function (k) {
@@ -675,6 +711,19 @@ define(['jquery'], function ($) {
                         });
                     }
 
+                    // Seed _minPages before refreshEditorPrice: prefer explicitly-passed value
+                    // (cart-edit flow), otherwise resolve from the Printess template API.
+                    if (opts.minPages !== null && opts.minPages !== undefined && opts.minPages >= 0) {
+                        _minPages = opts.minPages;
+                        _minPagesResolved = true;
+                    } else if (opts.templateName && opts.shopToken) {
+                        var reuseMinPages = await resolveMinPagesFromApi(api, opts.templateName, opts.shopToken);
+                        if (reuseMinPages > 0) {
+                            _minPages = reuseMinPages;
+                            _minPagesResolved = true;
+                        }
+                    }
+
                     refreshEditorPrice(_panelEditorRef, opts.basePrice || 0, opts.pagePricing || [], opts.currencyCode, opts.locale);
                     return;
                 }
@@ -693,6 +742,14 @@ define(['jquery'], function ($) {
         _selectedOptionPrices = {};
         _minPages = 0;
         _minPagesResolved = false;
+
+        // If the caller explicitly provides the known included-page count (e.g. from
+        // additional_options stored at add-to-cart time), seed _minPages immediately
+        // so the initial price display is correct without waiting for the Printess API.
+        if (opts.minPages !== null && opts.minPages !== undefined && opts.minPages >= 0) {
+            _minPages = opts.minPages;
+            _minPagesResolved = true;
+        }
 
         // Seed form fields from the initial values passed to Printess so the first
         // priceChangeCallback fires with the correct field state.
@@ -758,6 +815,9 @@ define(['jquery'], function ($) {
         if (opts.magicPhotobookTheme) loadCfg.magicPhotobookTheme = opts.magicPhotobookTheme;
         if (opts.printSettings) loadCfg.printSettings = opts.printSettings;
         if (opts.mergeTemplate) loadCfg.attach = { mergeTemplates: [{ templateName: opts.mergeTemplate }] };
+        if (typeof opts.showSaveAndCloseButton === 'boolean') {
+            loadCfg.showSaveAndCloseButton = opts.showSaveAndCloseButton;
+        }
         if (opts.saveTemplateCallback) {
             loadCfg.saveTemplateCallback = function (saveToken, type, thumbnailUrl) {
                 var activeOpts = _activePanelOpts || opts;
@@ -817,7 +877,7 @@ define(['jquery'], function ($) {
                 fieldHandlers.forEach(function (h) { h(name, value, null, name); });
             });
         }
-        if (liveInfo && liveInfo.pageCount !== null && !_minPagesResolved) {
+        if (liveInfo && liveInfo.pageCount !== null && liveInfo.pageCount > 0) {
             _currentPageCount = liveInfo.pageCount;
         }
 
@@ -908,35 +968,9 @@ define(['jquery'], function ($) {
     }
 
     async function postFormToCart(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef) {
-        var live = await getLivePriceInfoFromApi(apiRef);
-        var effectivePageCount = _currentPageCount || 0;
-        var effectiveFormFields = _currentFormFields || {};
-
-        if (live) {
-            if (live.pageCount !== null && !isNaN(live.pageCount) && live.pageCount > 0) {
-                effectivePageCount = live.pageCount;
-                _currentPageCount = live.pageCount;
-            }
-            if (live.formFields && typeof live.formFields === 'object') {
-                effectiveFormFields = live.formFields;
-                _currentFormFields = live.formFields;
-            }
-        }
-
-        var effectiveIncludedPages = (_minPages || 0);
-        var liveIncludedPages = await resolveMinPagesFromApi(apiRef, _currentTemplateName, _currentShopToken);
-        if (typeof liveIncludedPages === 'number') {
-            effectiveIncludedPages = liveIncludedPages;
-            _minPages = liveIncludedPages;
-            _minPagesResolved = true;
-        }
-
         ensureMagentoOptionInputs(form, variantOptions, customOptions);
         setOrAddHidden(form, 'saveToken', saveToken || '');
         setOrAddHidden(form, 'thumbnailUrl', thumbnailUrl || '');
-        setOrAddHidden(form, 'printessPageCount', String(effectivePageCount));
-        setOrAddHidden(form, 'printessIncludedPages', String(effectiveIncludedPages));
-        setOrAddHidden(form, 'printessFormFields', JSON.stringify(effectiveFormFields));
 
         var formData = new FormData(form);
 
@@ -946,7 +980,7 @@ define(['jquery'], function ($) {
             credentials: 'same-origin',
             redirect: 'follow'
         }).then(function () {
-            window.location.href = '/checkout/cart/';
+            window.location.href = mageUrl.build('checkout/cart/');
         }).catch(function (err) {
             console.error('Printess: add-to-cart failed', err);
             form.submit();
@@ -965,6 +999,7 @@ define(['jquery'], function ($) {
         openFromProduct: function (cfg) {
             var variantOptions = cfg.variantOptions || [];
             var customOptions = cfg.customOptions || [];
+            _namePromptConfig = cfg.namePrompt || {};
             // console.warn('[Printess] openFromProduct', { variantOptions: variantOptions, customOptions: customOptions });
             var panelCfg = {
                 shopToken: cfg.shopToken,
@@ -980,6 +1015,7 @@ define(['jquery'], function ($) {
                 currencyCode: cfg.currencyCode,
                 locale: cfg.locale,
                 basePrice: cfg.basePrice,
+                bypassMagentoPriceBox: cfg.bypassMagentoPriceBox || false,
                 onAddToBasket: async function (saveToken, thumbnailUrl, apiRef) {
                     var form = getOrCreateCartForm({
                         formId: cfg.formId || 'product_addtocart_form',
@@ -992,7 +1028,13 @@ define(['jquery'], function ($) {
                         throw new Error('form not found');
                     }
                     if (cfg.onAddToBasket) {
-                        try { await cfg.onAddToBasket(saveToken, thumbnailUrl); } catch (e) {}
+                        try {
+                            var onBasketResult = await cfg.onAddToBasket(saveToken, thumbnailUrl);
+                            var capturedProjectId = onBasketResult && onBasketResult.project_id ? onBasketResult.project_id : null;
+                            if (capturedProjectId) {
+                                setOrAddHidden(form, 'printessProjectId', String(capturedProjectId));
+                            }
+                        } catch (e) {}
                     }
                     return postFormToCart(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef);
                 }
@@ -1007,6 +1049,7 @@ define(['jquery'], function ($) {
          * should then call addToBasketFromSlim().
          */
         initSlimUi: function (cfg) {
+            _namePromptConfig = cfg.namePrompt || {};
             _currentTemplateName = cfg.templateName || '';
             _currentShopToken = cfg.shopToken || '';
             _slimFormId = cfg.formId || 'product_addtocart_form';
@@ -1152,29 +1195,101 @@ define(['jquery'], function ($) {
          */
         openFromCart: function (cfg) {
             openPanelEditor({
-                shopToken: cfg.shopToken,
-                templateName: cfg.saveToken,
-                onAddToBasket: function (newSaveToken, newThumbnailUrl) {
+                shopToken:           cfg.shopToken,
+                templateName:        cfg.saveToken,
+                basePrice:           cfg.basePrice || 0,
+                customOptions:       cfg.customOptions || [],
+                formFields:          cfg.formFields || [],
+                pagePricing:         cfg.pagePricing || [],
+                currencyCode:        cfg.currencyCode,
+                locale:              cfg.locale,
+                minPages:            (typeof cfg.minPages === 'number' && cfg.minPages >= 0) ? cfg.minPages : null,
+                theme:               cfg.theme,
+                magicPhotobookTheme: cfg.magicPhotobookTheme,
+                printSettings:       cfg.printSettings,
+                // Hide Save & Quit — in cart-edit mode the cart icon is the only
+                // meaningful action; "Save & Quit" would confuse customers because
+                // it does not reprice or update the Magento cart item options.
+                showSaveAndCloseButton: false,
+                saveTemplateCallback: cfg.saveUrl ? function (newSaveToken, type, thumbnailUrl) {
+                    var postData = {
+                        save_token:    newSaveToken,
+                        product_id:    cfg.productId || '',
+                        thumbnail_url: thumbnailUrl || '',
+                        form_key:      cfg.formKey
+                    };
+                    if (cfg.projectId) {
+                        postData.project_id = cfg.projectId;
+                    }
+                    var afterSave = function () {
+                        // Silently update the cart item's save token so re-opening
+                        // the editor loads the latest saved version. This always
+                        // re-prices server-side from /book/info — there is no
+                        // token-only fast path.
+                        if (cfg.updateUrl && cfg.itemId) {
+                            $.ajax({
+                                url:    cfg.updateUrl,
+                                method: 'POST',
+                                data: {
+                                    itemId:       cfg.itemId,
+                                    saveToken:    newSaveToken,
+                                    thumbnailUrl: thumbnailUrl || '',
+                                    form_key:     cfg.formKey
+                                }
+                            });
+                        }
+                        if (type === 'close') {
+                            window.location.reload();
+                        }
+                    };
+                    $.ajax({
+                        url:     cfg.saveUrl,
+                        method:  'POST',
+                        data:    postData,
+                        success: afterSave,
+                        error:   afterSave
+                    });
+                } : undefined,
+                onAddToBasket: async function (newSaveToken, newThumbnailUrl, apiRef) {
+                    showCartLoader('Updating your project\u2026');
+
+                    // Silently keep the account project in sync with the cart item's
+                    // latest save token so My Projects reflects the most recent edit.
+                    if (cfg.saveUrl && (cfg.projectId || cfg.productId)) {
+                        var syncData = {
+                            save_token:    newSaveToken,
+                            product_id:    cfg.productId || '',
+                            thumbnail_url: newThumbnailUrl || '',
+                            form_key:      cfg.formKey
+                        };
+                        if (cfg.projectId) { syncData.project_id = cfg.projectId; }
+                        $.ajax({ url: cfg.saveUrl, method: 'POST', data: syncData });
+                    }
+
                     return new Promise(function (resolve, reject) {
                         $.ajax({
                             url: cfg.updateUrl,
                             method: 'POST',
                             data: {
-                                itemId: cfg.itemId,
-                                saveToken: newSaveToken,
+                                itemId:       cfg.itemId,
+                                saveToken:    newSaveToken,
                                 thumbnailUrl: newThumbnailUrl || '',
-                                form_key: cfg.formKey
+                                // Live editor form field values, used as a fallback when /book/info fails (e.g. Calendars).
+                                formFields:   JSON.stringify(_currentFormFields || {}),
+                                form_key:     cfg.formKey
                             },
                             success: function (response) {
                                 if (response && response.success) {
                                     resolve();
                                     window.location.reload();
                                 } else {
+                                    hideCartLoader();
                                     reject(new Error('update failed'));
                                     alert('Could not update your customisation. Please try again.');
                                 }
                             },
                             error: function () {
+                                hideCartLoader();
                                 reject(new Error('network error'));
                                 alert('Could not update your customisation. Please try again.');
                             }

@@ -15,6 +15,7 @@ use Magento\Framework\App\CsrfAwareActionInterface;
 use Magento\Framework\App\Request\InvalidRequestException;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\JsonFactory;
+use Magento\Framework\Data\Form\FormKey\Validator;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Store\Model\StoreManagerInterface;
@@ -31,13 +32,13 @@ use Psr\Log\LoggerInterface;
  *
  *  2. Form POST  — used by our saveTemplateCallback (printess-login-gate.js)
  *     after the customer clicks "Save & Quit" on a product-page session.
- *     Params: save_token, product_id, thumbnail_url, project_id
+ *     Params: save_token, product_id, thumbnail_url, project_id, form_key
  *
  * CSRF is bypassed only for JSON-body requests from the Printess SDK iframe,
  * which cannot include a Magento form key. Form POST requests from our own JS
- * must carry a valid form key. Session authentication still applies:
- * customer_id is always read from the session and ProjectManager enforces
- * ownership on every operation.
+ * must carry a valid form key, which is enforced below. Session authentication
+ * still applies regardless: customer_id is always read from the session and
+ * ProjectManager enforces ownership on every operation.
  */
 class Save implements HttpPostActionInterface, CsrfAwareActionInterface
 {
@@ -52,8 +53,10 @@ class Save implements HttpPostActionInterface, CsrfAwareActionInterface
         private readonly ProjectConfig         $projectConfig,
         private readonly StoreManagerInterface $storeManager,
         private readonly DateTime              $dateTime,
-        private readonly LoggerInterface       $logger
-    ) {}
+        private readonly LoggerInterface       $logger,
+        private readonly Validator             $formKeyValidator
+    ) {
+    }
 
     public function createCsrfValidationException(RequestInterface $request): ?InvalidRequestException
     {
@@ -106,7 +109,9 @@ class Save implements HttpPostActionInterface, CsrfAwareActionInterface
         $name         = trim((string) $this->request->getParam('project_name', '')) ?: null;
         if ($name !== null) {
             $name = mb_substr(strip_tags($name), 0, 255);
-            if ($name === '') { $name = null; }
+            if ($name === '') {
+                $name = null;
+            }
         }
 
         if ($saveToken === '') {
