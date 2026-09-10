@@ -1,0 +1,28 @@
+<?php
+/** @var \Printess\PrintessEditor\Block\Order\ReorderButton $block */
+if (!$block->isPrintessItem()) {
+    return;
+}
+
+$itemData = $block->getItemData();
+$uid      = uniqid('po_');
+?>
+
+<div class="printess-order-item-reorder" id="printess-reorder-<?= /* @noEscape */ $uid ?>" style="margin-top:8px;">
+    <button type="button" class="action secondary printess-reorder-button">
+        <span><?= $block->escapeHtml(__('Edit & Reorder')) ?></span>
+    </button>
+    <div class="printess-reorder-message" style="display:none;margin-top:6px;font-size:12px;"></div>
+</div>
+
+<script type="text/x-magento-init">
+{
+    "#printess-reorder-<?= /* @noEscape */ $uid ?>": {
+        "Printess_PrintessEditor/js/printess-reorder": {
+            "orderItemId": <?= /* @noEscape */ (int) $itemData['orderItemId'] ?>,
+            "checkUrl": <?= /* @noEscape */ json_encode($itemData['checkUrl']) ?>,
+            "formKey": <?= /* @noEscape */ json_encode($itemData['formKey']) ?>
+        }
+    }
+}
+</script>

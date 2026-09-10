@@ -53,38 +53,6 @@ define([
         return Boolean(customer() && customer().firstname);
     }
 
-    function saveProject(config, saveToken, thumbnailUrl, projectName) {
-        return $.ajax({
-            url: config.saveUrl,
-            type: 'POST',
-            dataType: 'json',
-            data: {
-                form_key: window.FORM_KEY,
-                project_id: config.projectId || '',
-                product_id: config.productId,
-                save_token: saveToken,
-                thumbnail_url: thumbnailUrl || '',
-                project_name: projectName || ''
-            }
-        }).then(function (response) {
-            if (!response || response.success !== true) {
-                return $.Deferred().reject(response).promise();
-            }
-
-            config.projectId = response.project_id;
-            return response;
-        }, function (xhr) {
-            var response = xhr.responseJSON || {};
-
-            alert({
-                title: $t('Unable to Save Project'),
-                content: response.message || $t('The project could not be saved. Please try again.')
-            });
-
-            return $.Deferred().reject(xhr).promise();
-        });
-    }
-
     function openEditor(config) {
         require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessEditor) {
             PrintessEditor.openFromProduct({
@@ -102,9 +70,13 @@ define([
                 theme: config.theme,
                 magicPhotobookTheme: config.magicPhotobookTheme,
                 printSettings: config.printSettings,
-                mergeTemplate: config.mergeTemplate,
+                mergeTemplates: config.mergeTemplates,
                 namePrompt: config.namePrompt || {},
                 bypassMagentoPriceBox: config.bypassMagentoPriceBox || false,
+                shopUserId: config.shopUserId || '',
+                productName: config.productName || '',
+                productUrl: config.productUrl || '',
+                isLoggedIn: true,
                 onAddToBasket: function (saveToken, thumbnailUrl) {
                     var validThumbnail = (typeof thumbnailUrl === 'string' && thumbnailUrl.indexOf('https://') === 0)
                         ? thumbnailUrl

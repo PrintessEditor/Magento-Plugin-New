@@ -55,7 +55,11 @@ define([
             theme: config.theme,
             magicPhotobookTheme: config.magicPhotobookTheme,
             printSettings: config.printSettings,
-            mergeTemplate: config.mergeTemplate,
+            mergeTemplates: config.mergeTemplates,
+            shopUserId: config.shopUserId || '',
+            productName: config.productName || '',
+            productUrl: config.productUrl || '',
+            isLoggedIn: true,
             onAddToBasket: function (saveToken, thumbnailUrl) {
                 var validThumbnail = (typeof thumbnailUrl === 'string' && thumbnailUrl.indexOf('https://') === 0)
                     ? thumbnailUrl

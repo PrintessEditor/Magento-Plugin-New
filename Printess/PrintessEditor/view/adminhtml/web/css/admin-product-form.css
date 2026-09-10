@@ -1,0 +1,20 @@
+/**
+ * Lays the "Use Printess Slim UI" and "Allow Switch to Full Editor" product-attribute
+ * checkboxes out side by side in the admin product form.
+ *
+ * Deliberately plain CSS keyed off each field's `data-index` attribute (set by
+ * Magento_Ui's ui/form/field.html for every field) rather than Magento_Ui's "group"
+ * component -- see PrintessSlimUiFullEditorModifier for why the group component isn't
+ * used here (it has a core bug that drops the label on checkbox/radio children).
+ */
+.product-form .admin__field[data-index="printess_slim_ui"],
+.product-form .admin__field[data-index="printess_slim_ui_full_editor"] {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 47%;
+    vertical-align: top;
+}
+
+.product-form .admin__field[data-index="printess_slim_ui"] {
+    margin-right: 2%;
+}

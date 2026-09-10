@@ -11,6 +11,7 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
     var _panelLoaderPromise = null;
     var _slimApi = null;   // slim UI instance
     var _slimFormId = null;   // form to submit on "Add to Basket"
+    var _slimOriginalCfg = null;   // full initSlimUi() cfg, kept so we can relaunch the panel editor with the same options
     var _panelEditorRef = null;   // active panel editor reference
     var _panelHistoryPushed = false;  // true while editor history state is on the stack
     var _currentPageCount = 0;      // last page count reported by priceChangeCallback
@@ -38,17 +39,17 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
         });
         overlay.innerHTML =
             '<div style="display:flex;flex-direction:column;align-items:center;gap:16px;">' +
-              '<style>' +
-              '@keyframes printess-loader-rotate{100%{transform:rotate(360deg)}}' +
-              '@keyframes printess-loader-dash{0%{stroke-dasharray:1,200;stroke-dashoffset:0}50%{stroke-dasharray:89,200;stroke-dashoffset:-35}100%{stroke-dasharray:89,200;stroke-dashoffset:-124}}' +
-              '</style>' +
-              '<div style="width:68px;height:68px;">' +
-                '<svg viewBox="25 25 50 50" style="animation:printess-loader-rotate 2s linear infinite;height:100%;width:100%;">' +
-                  '<circle cx="50" cy="50" r="20" fill="none" stroke="#fff" stroke-width="5" stroke-miterlimit="10"' +
-                  ' style="stroke-dasharray:1,200;stroke-dashoffset:0;animation:printess-loader-dash 1.5s ease-in-out infinite;stroke-linecap:round;"/>' +
-                '</svg>' +
-              '</div>' +
-              (message ? '<span style="color:#fff;font-family:system-ui,sans-serif;font-size:15px;font-weight:500;">' + message + '</span>' : '') +
+            '<style>' +
+            '@keyframes printess-loader-rotate{100%{transform:rotate(360deg)}}' +
+            '@keyframes printess-loader-dash{0%{stroke-dasharray:1,200;stroke-dashoffset:0}50%{stroke-dasharray:89,200;stroke-dashoffset:-35}100%{stroke-dasharray:89,200;stroke-dashoffset:-124}}' +
+            '</style>' +
+            '<div style="width:68px;height:68px;">' +
+            '<svg viewBox="25 25 50 50" style="animation:printess-loader-rotate 2s linear infinite;height:100%;width:100%;">' +
+            '<circle cx="50" cy="50" r="20" fill="none" stroke="#fff" stroke-width="5" stroke-miterlimit="10"' +
+            ' style="stroke-dasharray:1,200;stroke-dashoffset:0;animation:printess-loader-dash 1.5s ease-in-out infinite;stroke-linecap:round;"/>' +
+            '</svg>' +
+            '</div>' +
+            (message ? '<span style="color:#fff;font-family:system-ui,sans-serif;font-size:15px;font-weight:500;">' + message + '</span>' : '') +
             '</div>';
         document.body.appendChild(overlay);
         _cartLoaderOverlay = overlay;
@@ -422,6 +423,15 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
         return fields;
     }
 
+    // Merges predefined (product-level) form fields with auto-detected variant/option fields.
+    // Auto-detected fields take precedence so that active Magento selections always win.
+    function mergePredefinedFormFields(predefined, auto) {
+        var map = {};
+        (predefined || []).forEach(function (ff) { if (ff.name) map[ff.name] = ff.value; });
+        (auto || []).forEach(function (ff) { if (ff.name) map[ff.name] = ff.value; });
+        return Object.keys(map).map(function (k) { return { name: k, value: map[k] }; });
+    }
+
     function findMatchingVariantAttr(variantOptions, fieldName, fieldLabel) {
         var nameLower = (fieldName || '').toLowerCase();
         var labelLower = (fieldLabel || '').toLowerCase();
@@ -491,11 +501,95 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
         return null;
     }
 
-    // --- saved projects helpers ---
+    // --- Utilities ---
 
-    function esc(str) {
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    function escapeHtml(str) {
+        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
+
+    // --- Load projects modal ---
+
+    function showLoadProjectsModal(projects, activeOpts) {
+        var overlay = document.createElement('div');
+        overlay.className = 'printess-owned';
+        Object.assign(overlay.style, {
+            position: 'fixed', inset: '0', zIndex: '2147483647',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)'
+        });
+
+        var cardsHtml = '';
+        if (!projects.length) {
+            cardsHtml = '<p style="color:#888;text-align:center;padding:24px 0;margin:0;">No saved projects found for this product.</p>';
+        } else {
+            cardsHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;max-height:420px;overflow-y:auto;padding:2px;">';
+            for (var i = 0; i < projects.length; i++) {
+                var p = projects[i];
+                var thumbHtml = p.thumbnailUrl
+                    ? '<img src="' + escapeHtml(p.thumbnailUrl) + '" alt="" style="width:100%;height:100px;object-fit:cover;display:block;" />'
+                    : '<div style="width:100%;height:100px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;">' +
+                    '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>' +
+                    '</div>';
+                var dateStr = '';
+                if (p.updatedAt) {
+                    try { dateStr = new Date(p.updatedAt.replace(' ', 'T') + 'Z').toLocaleDateString(); } catch (e) { dateStr = ''; }
+                }
+                cardsHtml +=
+                    '<div class="pe-project-card" data-idx="' + i + '" style="cursor:pointer;border:1px solid #e5e5e5;border-radius:6px;overflow:hidden;background:#fff;">' +
+                    thumbHtml +
+                    '<div style="padding:8px;">' +
+                    '<div style="font-size:13px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + '</div>' +
+                    (dateStr ? '<div style="font-size:11px;color:#999;margin-top:2px;">' + escapeHtml(dateStr) + '</div>' : '') +
+                    '</div></div>';
+            }
+            cardsHtml += '</div>';
+        }
+
+        overlay.innerHTML =
+            '<style>.pe-project-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.15);border-color:#bbb!important;}</style>' +
+            '<div style="background:#fff;border-radius:10px;padding:24px;width:540px;max-width:92vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.3);font-family:system-ui,sans-serif;">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-shrink:0;">' +
+            '<h3 style="margin:0;font-size:18px;font-weight:600;color:#1a1a1a;">Load Project</h3>' +
+            '<button id="pe-load-close" style="background:none;border:none;cursor:pointer;font-size:22px;line-height:1;color:#888;padding:0 4px;">&times;</button>' +
+            '</div>' +
+            cardsHtml +
+            '</div>';
+
+        document.body.appendChild(overlay);
+
+        function close() { if (overlay.parentNode) { document.body.removeChild(overlay); } }
+
+        overlay.querySelector('#pe-load-close').addEventListener('click', close);
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) { close(); } });
+
+        overlay.querySelectorAll('.pe-project-card').forEach(function (card) {
+            card.addEventListener('click', function () {
+                var idx = parseInt(card.getAttribute('data-idx'), 10);
+                var project = projects[idx];
+                close();
+                if (_panelEditorRef && _panelEditorRef.api && project && project.saveToken) {
+                    if (activeOpts) { activeOpts.projectId = project.id || null; }
+                    _panelEditorRef.api.load(project.saveToken);
+                }
+            });
+        });
+    }
+
+    function openLoadProjectsModal(activeOpts) {
+        var baseUrl = String(window.BASE_URL || '/').replace(/\/?$/, '/');
+        var productId = (activeOpts && activeOpts.productId) ? String(activeOpts.productId) : '';
+        fetch(baseUrl + 'printess/project/forproduct', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ product_id: productId })
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) { showLoadProjectsModal((data && data.projects) || [], activeOpts); })
+            .catch(function () { showLoadProjectsModal([], activeOpts); });
+    }
+
+    // --- saved projects helpers ---
 
     // --- pricing helpers ---
 
@@ -668,7 +762,7 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
         if (_panelEditorRef) {
             _activePanelOpts = opts;
             try {
-                var ui  = _panelEditorRef.ui  || _panelEditorRef;
+                var ui = _panelEditorRef.ui || _panelEditorRef;
                 var api = _panelEditorRef.api || _panelEditorRef;
 
                 if (ui && typeof ui.show === 'function') {
@@ -700,7 +794,7 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
                             if (value === '' || value === undefined) return;
                             _currentFormFields[name] = value;
                             var reuseVariantOptions = reuseOpts.variantOptions || [];
-                            var reuseCustomOptions  = reuseOpts.customOptions  || [];
+                            var reuseCustomOptions = reuseOpts.customOptions || [];
                             var attr = findMatchingVariantAttr(reuseVariantOptions, name, name);
                             if (attr) { setVariantInMagento(attr, value); return; }
                             var opt = findMatchingCustomOption(reuseCustomOptions, name, name);
@@ -790,7 +884,7 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
             fieldHandlers.push(function (fieldName, value, tag, fieldLabel) {
                 var activeOpts = _activePanelOpts || opts;
                 var currentVariantOptions = activeOpts.variantOptions || [];
-                var currentCustomOptions  = activeOpts.customOptions  || [];
+                var currentCustomOptions = activeOpts.customOptions || [];
                 var attr = findMatchingVariantAttr(currentVariantOptions, fieldName, fieldLabel);
                 if (attr) { setVariantInMagento(attr, value); return; }
                 var opt = findMatchingCustomOption(currentCustomOptions, fieldName, fieldLabel);
@@ -814,7 +908,7 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
         if (opts.theme) loadCfg.theme = opts.theme;
         if (opts.magicPhotobookTheme) loadCfg.magicPhotobookTheme = opts.magicPhotobookTheme;
         if (opts.printSettings) loadCfg.printSettings = opts.printSettings;
-        if (opts.mergeTemplate) loadCfg.attach = { mergeTemplates: [{ templateName: opts.mergeTemplate }] };
+        if (opts.mergeTemplates && opts.mergeTemplates.length) loadCfg.attach = { mergeTemplates: opts.mergeTemplates };
         if (typeof opts.showSaveAndCloseButton === 'boolean') {
             loadCfg.showSaveAndCloseButton = opts.showSaveAndCloseButton;
         }
@@ -1004,18 +1098,23 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
             var panelCfg = {
                 shopToken: cfg.shopToken,
                 templateName: cfg.templateName,
-                formFields: buildAutoFormFields(variantOptions, customOptions),
+                formFields: mergePredefinedFormFields(cfg.predefinedFormFields, buildAutoFormFields(variantOptions, customOptions)),
                 variantOptions: variantOptions,
                 customOptions: customOptions,
                 theme: cfg.theme,
                 magicPhotobookTheme: cfg.magicPhotobookTheme,
                 printSettings: cfg.printSettings,
-                mergeTemplate: cfg.mergeTemplate,
+                mergeTemplates: cfg.mergeTemplates,
                 pagePricing: cfg.pagePricing || [],
                 currencyCode: cfg.currencyCode,
                 locale: cfg.locale,
                 basePrice: cfg.basePrice,
                 bypassMagentoPriceBox: cfg.bypassMagentoPriceBox || false,
+                shopUserId: cfg.shopUserId || '',
+                productId: cfg.productId || '',
+                productDisplayName: cfg.productName || '',
+                productUrl: cfg.productUrl || '',
+                isLoggedIn: cfg.isLoggedIn !== false,
                 onAddToBasket: async function (saveToken, thumbnailUrl, apiRef) {
                     var form = getOrCreateCartForm({
                         formId: cfg.formId || 'product_addtocart_form',
@@ -1036,10 +1135,10 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
                             }
                         } catch (e) {}
                     }
+                    showCartLoader('Adding to Cart...');
                     return postFormToCart(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef);
                 }
             };
-            panelCfg.saveTemplateCallback = cfg.saveTemplateCallback || buildSaveCallback();
             openPanelEditor(panelCfg);
         },
 
@@ -1050,6 +1149,7 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
          */
         initSlimUi: function (cfg) {
             _namePromptConfig = cfg.namePrompt || {};
+            _slimOriginalCfg = cfg;
             _currentTemplateName = cfg.templateName || '';
             _currentShopToken = cfg.shopToken || '';
             _slimFormId = cfg.formId || 'product_addtocart_form';
@@ -1076,13 +1176,13 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
                     shopToken: cfg.shopToken,
                     templateName: cfg.templateName,
                     published: true,
-                    formFields: buildAutoFormFields(variantOptions, customOptions)
+                    formFields: mergePredefinedFormFields(cfg.predefinedFormFields, buildAutoFormFields(variantOptions, customOptions))
                 };
 
                 if (cfg.theme) slimCfg.theme = cfg.theme;
                 if (cfg.magicPhotobookTheme) slimCfg.magicPhotobookTheme = cfg.magicPhotobookTheme;
                 if (cfg.printSettings) slimCfg.printSettings = cfg.printSettings;
-                if (cfg.mergeTemplate) slimCfg.attach = { mergeTemplates: [{ templateName: cfg.mergeTemplate }] };
+                if (cfg.mergeTemplates && cfg.mergeTemplates.length) slimCfg.attach = { mergeTemplates: cfg.mergeTemplates };
 
                 if (variantOptions.length || customOptions.length) {
                     slimCfg.formFieldChangedCallback = function (fieldName, value, tag, fieldLabel) {
@@ -1187,6 +1287,64 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
                 );
             }).catch(function (err) {
                 console.error('Printess: createSaveToken failed', err);
+            });
+        },
+
+        /**
+         * Slim UI — "Switch to Full Editor" button. Snapshots the customer's current
+         * in-progress Slim UI document via createSaveToken() (the same call used by
+         * addToBasketFromSlim), then reopens that snapshot in the Panel editor — the
+         * same save-token-as-template technique openFromCart() already uses to reopen
+         * a cart item. On save, the flow rejoins the normal add-to-cart path.
+         */
+        openFullEditorFromSlim: function () {
+            if (!_slimApi) {
+                console.error('Printess: Slim UI not ready');
+                return;
+            }
+
+            var cfg = _slimOriginalCfg || {};
+            var variantOptions = cfg.variantOptions || [];
+            var customOptions = cfg.customOptions || [];
+
+            showCartLoader('Loading Full Editor...');
+
+            _slimApi.createSaveToken().then(function (data) {
+                hideCartLoader();
+
+                openPanelEditor({
+                    shopToken: cfg.shopToken || _currentShopToken,
+                    templateName: data.saveToken,
+                    variantOptions: variantOptions,
+                    customOptions: customOptions,
+                    theme: cfg.theme,
+                    magicPhotobookTheme: cfg.magicPhotobookTheme,
+                    printSettings: cfg.printSettings,
+                    mergeTemplates: cfg.mergeTemplates,
+                    pagePricing: cfg.pagePricing || [],
+                    basePrice: cfg.basePrice || 0,
+                    currencyCode: cfg.currencyCode,
+                    locale: cfg.locale,
+                    isLoggedIn: true,
+                    onAddToBasket: function (saveToken, thumbnailUrl, apiRef) {
+                        var form = getOrCreateCartForm({
+                            formId: cfg.formId || 'product_addtocart_form',
+                            addToCartUrl: cfg.addToCartUrl || '',
+                            productId: cfg.productId || '',
+                            formKey: cfg.formKey || ''
+                        });
+                        if (!form) {
+                            console.error('Printess: add-to-cart form not found');
+                            throw new Error('form not found');
+                        }
+                        showCartLoader('Adding to Cart...');
+                        return postFormToCart(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef);
+                    }
+                });
+            }).catch(function (err) {
+                hideCartLoader();
+                console.error('Printess: could not switch to full editor', err);
+                alert('Could not open the full editor. Please try again.');
             });
         },
 
