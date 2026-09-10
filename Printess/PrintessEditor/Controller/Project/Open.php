@@ -100,17 +100,13 @@ class Open extends Action implements HttpPostActionInterface
                     'theme' => (string) ($product->getData('printess_theme') ?: $this->printessConfig->getEditorTheme()),
                     'magicPhotobookTheme' => (string) ($product->getData('printess_magic_photobook_theme') ?: ''),
                     'printSettings' => (string) ($product->getData('printess_print_settings') ?: $this->printessConfig->getPrintSettings()),
-                    'mergeTemplates' => array_values(array_map(
-                        static function (array $r): array {
-                            $entry = ['templateName' => (string)($r['mergeTemplate'] ?? '')];
-                            if (($r['mergeMode'] ?? '') !== '') { $entry['mergeMode'] = (string)$r['mergeMode']; }
-                            return $entry;
-                        },
-                        array_filter(
-                            (array) ($product->getData('printess_merge_template') ?: []),
-                            static fn($r): bool => is_array($r) && trim((string)($r['mergeTemplate'] ?? '')) !== ''
-                        )
-                    ))
+                    'mergeTemplates' => (function () use ($product): array {
+                        // Our schema stores a single merge-template varchar attribute (see
+                        // AddMergeTemplateAttribute), not vendor's multi-row array — build the
+                        // zero-or-one-element array the editor JS expects directly.
+                        $mergeTemplate = trim((string) $product->getData('printess_merge_template'));
+                        return $mergeTemplate !== '' ? [['templateName' => $mergeTemplate]] : [];
+                    })()
                 ]
             ]);
         } catch (LocalizedException $exception) {

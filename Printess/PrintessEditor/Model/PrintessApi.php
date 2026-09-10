@@ -186,7 +186,16 @@ class PrintessApi
             ],
         ]);
 
-        $response = @file_get_contents($url, false, $ctx);
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction -- file_get_contents is the appropriate
+        // method here; error suppression replaced with set_error_handler to capture network failures.
+        set_error_handler(static function (int $errno, string $errstr) use ($url): never {
+            throw new \RuntimeException('Printess API request to ' . $url . ' failed: ' . $errstr, $errno);
+        });
+        try {
+            $response = file_get_contents($url, false, $ctx);
+        } finally {
+            restore_error_handler();
+        }
 
         if ($response === false) {
             throw new \RuntimeException('Printess API request to ' . $path . ' failed (network error)');
