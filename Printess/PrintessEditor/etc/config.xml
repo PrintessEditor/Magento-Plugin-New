@@ -3,6 +3,19 @@
         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
     <default>
         <printess_designer>
+            <project_name>
+                <enabled>1</enabled>
+                <prompt_text>Give this project a name so you can manage it later.</prompt_text>
+                <placeholder>e.g. My Wedding Album</placeholder>
+                <action_label>Save name</action_label>
+            </project_name>
+            <login_popup>
+                <new_customer_heading>Sign up to get started</new_customer_heading>
+                <customer_login_heading>Login to save your project</customer_login_heading>
+            </login_popup>
+            <debug>
+                <enabled_logging>0</enabled_logging>
+            </debug>
             <projects>
                 <enabled>0</enabled>
                 <retention_days>30</retention_days>

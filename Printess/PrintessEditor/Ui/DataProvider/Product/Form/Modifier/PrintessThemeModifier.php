@@ -15,7 +15,8 @@ class PrintessThemeModifier extends AbstractModifier
         private readonly ArrayManager       $arrayManager,
         private readonly EditorTheme        $editorThemeSource,
         private readonly MagicPhotobookTheme $magicPhotobookThemeSource
-    ) {}
+    ) {
+    }
 
     public function modifyData(array $data): array
     {

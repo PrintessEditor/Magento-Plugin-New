@@ -27,7 +27,8 @@ class EnqueuePdfJobs implements ObserverInterface
         private readonly PdfJobFactory $pdfJobFactory,
         private readonly PdfJobResource $pdfJobResource,
         private readonly LoggerInterface $logger
-    ) {}
+    ) {
+    }
 
     public function execute(Observer $observer): void
     {

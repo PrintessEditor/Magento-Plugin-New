@@ -8,18 +8,12 @@ $_printessData = $block->getData('printessData');
 $_locale       = $_printessData->getLocale();
 $_store        = $block->getProduct()->getStore();
 $_currencyCode = $_store->getCurrentCurrencyCode();
-$_template       = (string)($_product->getData('printess_template') ?? '');
-$_mergeTemplates = json_encode(array_values(array_map(
-    static function (array $r): array {
-        $entry = ['templateName' => (string)($r['mergeTemplate'] ?? '')];
-        if (($r['mergeMode'] ?? '') !== '') { $entry['mergeMode'] = (string)$r['mergeMode']; }
-        return $entry;
-    },
-    array_filter(
-        (array)($_product->getData('printess_merge_template') ?: []),
-        static fn($r): bool => is_array($r) && trim((string)($r['mergeTemplate'] ?? '')) !== ''
-    )
-)));
+$_template      = (string)($_product->getData('printess_template') ?? '');
+$_mergeTemplate = (string)($_product->getData('printess_merge_template') ?? '');
+// JS-facing shape only: vendor's editor JS takes an array of merge templates. We still
+// store/administer a single merge template per product (see AddMergeTemplateAttribute),
+// so this is always a zero- or one-element array built from that one attribute.
+$_mergeTemplates = json_encode($_mergeTemplate !== '' ? [['templateName' => $_mergeTemplate]] : []);
 $_shopToken = $_config->getShopToken();
 $_isSlimUi  = $_template !== '' && $_shopToken !== '' && (bool)$_product->getData('printess_slim_ui');
 $_isPrintess = $_template !== '' && $_shopToken !== '' && !$_isSlimUi;
@@ -38,19 +32,27 @@ $_printSettings        = $_productPrintSettings !== '' ? $_productPrintSettings 
 $_magicPhotobookTheme = (string)($_product->getData('printess_magic_photobook_theme') ?? '');
 
 // Per-page pricing
-$_pagePricing = json_encode($_product->getData('printess_page_pricing') ?: []);
-$_basePrice   = (float)$_product->getFinalPrice();
+$_pagePricingRaw = $_product->getData('printess_page_pricing');
+$_pagePricing = json_encode(
+    is_array($_pagePricingRaw)
+        ? $_pagePricingRaw
+        : (json_decode((string)$_pagePricingRaw, true) ?: [])
+);
 
-// Predefined form fields: convert {fieldName, fieldValue} storage format to {name, value} for JS
-$_predefinedFormFields = json_encode(array_values(array_map(
-    static function (array $row): array {
-        return ['name' => (string)($row['fieldName'] ?? ''), 'value' => (string)($row['fieldValue'] ?? '')];
-    },
-    array_filter(
-        (array)($_product->getData('printess_form_fields') ?: []),
-        static function (array $row): bool { return trim((string)($row['fieldName'] ?? '')) !== ''; }
-    )
-)));
+// Save project name popup config
+$_namePrompt = [
+    'enabled'     => $_config->isNamePromptEnabled(),
+    'text'        => $_config->getNamePromptText(),
+    'placeholder' => $_config->getNamePromptPlaceholder(),
+    'actionLabel' => $_config->getNamePromptActionLabel(),
+];
+
+// Login popup heading overrides
+$_loginPopup = [
+    'newCustomerHeading'  => $_config->getLoginNewCustomerHeading(),
+    'customerLoginHeading' => $_config->getLoginCustomerLoginHeading(),
+];
+$_basePrice   = (float)$_product->getFinalPrice();
 
 // Auto variant sync: all configurable attributes, matched by label in JS
 $_variantOptions = [];
@@ -60,7 +62,8 @@ if ($_product->getTypeId() === 'configurable') {
         $typeInstance = $_product->getTypeInstance();
         foreach ($typeInstance->getConfigurableAttributes($_product) as $cfgAttr) {
             $productAttr = $cfgAttr->getProductAttribute();
-            if (!$productAttr) continue;
+            if (!$productAttr) { continue;
+            }
             $optionMap = [];
             foreach ((array)$cfgAttr->getOptions() as $opt) {
                 $label = (string)($opt['label'] ?? '');
@@ -84,7 +87,8 @@ if ($_product->getTypeId() === 'configurable') {
 $_customOptions = [];
 try {
     foreach (($_product->getOptions() ?: []) as $_opt) {
-        if (!in_array($_opt->getType(), ['drop_down', 'radio'])) continue;
+        if (!in_array($_opt->getType(), ['drop_down', 'radio'])) { continue;
+        }
         $_vals = [];
         foreach ((array)$_opt->getValues() as $_val) {
             $_vals[] = [
@@ -106,15 +110,15 @@ try {
 }
 ?>
 
-<?php if ($_product->isSaleable()) : ?>
+<?php if ($_product->isSaleable()): ?>
 
-<?php if ($_isSlimUi) : ?>
+    <?php if ($_isSlimUi): ?>
 <!-- ── Printess Slim UI ──────────────────────────────────────────── -->
 <div class="printess-slim-wrapper" style="display:grid;grid-template-columns:2fr 380px;gap:20px;margin-bottom:20px;">
     <div class="printess-preview-container" style="position:relative;overflow:hidden;">
         <div class="printess-preview" style="margin-top:10px;max-height:70vh;background:#fff;display:flex;align-items:flex-start;justify-content:center;">
             <img class="printess-preview-image"
-                 alt="<?= $block->escapeHtmlAttr(__('Product preview')) ?>"
+                 alt="<?= $escaper->escapeHtmlAttr(__('Product preview')) ?>"
                  style="width:auto;height:auto;max-height:70vh;max-width:100%;opacity:1;transition:opacity .5s;border:1px solid #aaa;" />
             <div class="printess-image-loader" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:68px;display:none;">
                 <svg class="circular" viewBox="25 25 50 50" style="animation:printess-loader-rotate 2s linear infinite;height:100%;width:100%;">
@@ -128,22 +132,22 @@ try {
         <div class="printess-ui" style="overflow:auto;"></div>
         <div class="box-tocart" style="margin-top:10px;">
             <div class="fieldset">
-                <?php if ($block->shouldRenderQuantity()) : ?>
+                <?php if ($block->shouldRenderQuantity()): ?>
                 <div class="field qty">
-                    <label class="label" for="qty"><span><?= $block->escapeHtml(__('Qty')) ?></span></label>
+                    <label class="label" for="qty"><span><?= $escaper->escapeHtml(__('Qty')) ?></span></label>
                     <div class="control">
                         <input type="number" name="qty" id="qty" min="1" value="<?= $block->getProductDefaultQty() * 1 ?>"
-                               title="<?= $block->escapeHtmlAttr(__('Qty')) ?>" class="input-text qty"
-                               data-validate="<?= $block->escapeHtml(json_encode($block->getQuantityValidators())) ?>"/>
+                               title="<?= $escaper->escapeHtmlAttr(__('Qty')) ?>" class="input-text qty"
+                               data-validate="<?= $escaper->escapeHtml(json_encode($block->getQuantityValidators())) ?>"/>
                     </div>
                 </div>
                 <?php endif; ?>
                 <div class="actions">
                     <button type="button"
                             id="product-addtocart-button"
-                            title="<?= $block->escapeHtmlAttr(__('Add to Basket')) ?>"
+                            title="<?= $escaper->escapeHtmlAttr($_buttonLabel) ?>"
                             class="action primary tocart">
-                        <span><?= $block->escapeHtml(__('Add to Basket')) ?></span>
+                        <span><?= $escaper->escapeHtml($_buttonLabel) ?></span>
                     </button>
                     <?php if ($_slimUiFullEditorAllowed) : ?>
                     <button type="button"
@@ -181,7 +185,7 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
         magicPhotobookTheme: <?= /* @noEscape */ json_encode($_magicPhotobookTheme) ?>,
         printSettings:       <?= /* @noEscape */ json_encode($_printSettings) ?>,
         mergeTemplates:      <?= /* @noEscape */ $_mergeTemplates ?>,
-        predefinedFormFields: <?= /* @noEscape */ $_predefinedFormFields ?>
+        namePrompt:          <?= /* @noEscape */ json_encode($_namePrompt) ?>
     });
     document.getElementById('product-addtocart-button').addEventListener('click', function () {
         PrintessEditor.addToBasketFromSlim();
@@ -194,28 +198,28 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
 });
 </script>
 
-<?php elseif ($_isPrintess) : ?>
+<?php elseif ($_isPrintess): ?>
 <!-- ── Printess Panel UI ─────────────────────────────────────────── -->
 <div class="box-tocart">
     <div class="fieldset">
-        <?php if ($block->shouldRenderQuantity()) : ?>
+        <?php if ($block->shouldRenderQuantity()): ?>
         <!-- Qty hidden for Printess products: customer adjusts quantity in cart -->
         <div class="field qty" style="display:none;">
-            <label class="label" for="qty"><span><?= $block->escapeHtml(__('Qty')) ?></span></label>
+            <label class="label" for="qty"><span><?= $escaper->escapeHtml(__('Qty')) ?></span></label>
             <div class="control">
                 <input type="number" name="qty" id="qty" min="1" value="1"
-                       title="<?= $block->escapeHtmlAttr(__('Qty')) ?>"
+                       title="<?= $escaper->escapeHtmlAttr(__('Qty')) ?>"
                        class="input-text qty"
-                       data-validate="<?= $block->escapeHtml(json_encode($block->getQuantityValidators())) ?>"/>
+                       data-validate="<?= $escaper->escapeHtml(json_encode($block->getQuantityValidators())) ?>"/>
             </div>
         </div>
         <?php endif; ?>
         <div class="actions">
             <button type="button"
                     id="product-addtocart-button"
-                    title="<?= $block->escapeHtmlAttr($_buttonLabel) ?>"
+                    title="<?= $escaper->escapeHtmlAttr($_buttonLabel) ?>"
                     class="action primary tocart printess-design-action">
-                <span><?= $block->escapeHtml($_buttonLabel) ?></span>
+                <span><?= $escaper->escapeHtml($_buttonLabel) ?></span>
             </button>
         </div>
     </div>
@@ -243,35 +247,36 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
             "magicPhotobookTheme": <?= /* @noEscape */ json_encode($_magicPhotobookTheme) ?>,
             "printSettings": <?= /* @noEscape */ json_encode($_printSettings) ?>,
             "mergeTemplates": <?= /* @noEscape */ $_mergeTemplates ?>,
-            "predefinedFormFields": <?= /* @noEscape */ $_predefinedFormFields ?>
+            "namePrompt":    <?= /* @noEscape */ json_encode($_namePrompt) ?>,
+            "loginPopup":    <?= /* @noEscape */ json_encode($_loginPopup) ?>
         }
     }
 }
 </script>
 
-<?php else : ?>
+<?php else: ?>
 <!-- ── Standard Add to Cart ──────────────────────────────────────── -->
 <div class="box-tocart">
     <div class="fieldset">
-        <?php if ($block->shouldRenderQuantity()) : ?>
+        <?php if ($block->shouldRenderQuantity()): ?>
         <div class="field qty">
-            <label class="label" for="qty"><span><?= $block->escapeHtml(__('Qty')) ?></span></label>
+            <label class="label" for="qty"><span><?= $escaper->escapeHtml(__('Qty')) ?></span></label>
             <div class="control">
                 <input type="number" name="qty" id="qty" min="0"
                        value="<?= $block->getProductDefaultQty() * 1 ?>"
-                       title="<?= $block->escapeHtmlAttr(__('Qty')) ?>"
+                       title="<?= $escaper->escapeHtmlAttr(__('Qty')) ?>"
                        class="input-text qty"
-                       data-validate="<?= $block->escapeHtml(json_encode($block->getQuantityValidators())) ?>"/>
+                       data-validate="<?= $escaper->escapeHtml(json_encode($block->getQuantityValidators())) ?>"/>
             </div>
         </div>
         <?php endif; ?>
         <div class="actions">
             <button type="submit"
-                    title="<?= $block->escapeHtmlAttr(__('Add to Cart')) ?>"
+                    title="<?= $escaper->escapeHtmlAttr(__('Add to Cart')) ?>"
                     class="action primary tocart"
                     id="product-addtocart-button"
                     disabled>
-                <span><?= $block->escapeHtml(__('Add to Cart')) ?></span>
+                <span><?= $escaper->escapeHtml(__('Add to Cart')) ?></span>
             </button>
             <?= $block->getChildHtml('', true) ?>
         </div>

@@ -13,7 +13,8 @@ class PagePricing extends AbstractBackend
     public function __construct(
         private readonly RequestInterface $request,
         private readonly State $appState
-    ) {}
+    ) {
+    }
 
     public function beforeSave($object): void
     {

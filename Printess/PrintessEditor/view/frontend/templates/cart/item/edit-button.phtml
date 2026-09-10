@@ -8,22 +8,37 @@ $itemData = $block->getItemData();
 $uid      = uniqid('pe_');
 ?>
 
-<span class="action action-edit printess-cart-edit"
-      id="printess-edit-<?= /* @noEscape */ $uid ?>"
-      style="cursor:pointer;"
-      title="<?= $block->escapeHtmlAttr(__('Customize')) ?>">
-    <?= $block->escapeHtml(__('Customize')) ?>
-</span>
+<a class="action printess-cart-edit"
+   id="printess-edit-<?= /* @noEscape */ $uid ?>"
+   data-pe-debug='<?= /* @noEscape */ json_encode(['basePrice' => $itemData['basePrice'], 'currency' => $itemData['currencyCode'], 'minPages' => $itemData['minPages'], 'pagePricing' => $itemData['pagePricing']]) ?>'
+   href="#"
+   title="<?= $escaper->escapeHtmlAttr(__('Edit')) ?>">
+    <?= $escaper->escapeHtml(__('Edit')) ?>
+</a>
 
 <script>
 require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessEditor) {
-    document.getElementById('printess-edit-<?= /* @noEscape */ $uid ?>').addEventListener('click', function () {
+    document.getElementById('printess-edit-<?= /* @noEscape */ $uid ?>').addEventListener('click', function (e) {
+        e.preventDefault();
         PrintessEditor.openFromCart({
-            shopToken:  <?= /* @noEscape */ json_encode($itemData['shopToken']) ?>,
-            saveToken:  <?= /* @noEscape */ json_encode($itemData['saveToken']) ?>,
-            itemId:     <?= /* @noEscape */ (int)$itemData['itemId'] ?>,
-            updateUrl:  '<?= $block->escapeUrl($block->getUrl('printess/cart/update')) ?>',
-            formKey:    window.FORM_KEY || document.querySelector('[name="form_key"]')?.value || ''
+            shopToken:           <?= /* @noEscape */ json_encode($itemData['shopToken']) ?>,
+            saveToken:           <?= /* @noEscape */ json_encode($itemData['saveToken']) ?>,
+            itemId:              <?= /* @noEscape */ (int)$itemData['itemId'] ?>,
+            basePrice:           <?= /* @noEscape */ (float)$itemData['basePrice'] ?>,
+            pagePricing:         <?= /* @noEscape */ json_encode($itemData['pagePricing']) ?>,
+            currencyCode:        <?= /* @noEscape */ json_encode($itemData['currencyCode']) ?>,
+            locale:              <?= /* @noEscape */ json_encode($itemData['locale']) ?>,
+            minPages:            <?= /* @noEscape */ (int)$itemData['minPages'] ?>,
+            formFields:          <?= /* @noEscape */ json_encode($itemData['formFields']) ?>,
+            customOptions:       <?= /* @noEscape */ json_encode($itemData['customOptions']) ?>,
+            theme:               <?= /* @noEscape */ json_encode($itemData['theme']) ?>,
+            magicPhotobookTheme: <?= /* @noEscape */ json_encode($itemData['magicPhotobookTheme']) ?>,
+            printSettings:       <?= /* @noEscape */ json_encode($itemData['printSettings']) ?>,
+            updateUrl:           '<?= $escaper->escapeUrl($block->getUrl('printess/cart/update')) ?>',
+            saveUrl:             <?= /* @noEscape */ json_encode($itemData['saveUrl']) ?>,
+            projectId:           <?= /* @noEscape */ (int)$itemData['projectId'] ?>,
+            productId:           <?= /* @noEscape */ (int)$itemData['productId'] ?>,
+            formKey:             window.FORM_KEY || document.querySelector('[name="form_key"]')?.value || ''
         });
     });
 });

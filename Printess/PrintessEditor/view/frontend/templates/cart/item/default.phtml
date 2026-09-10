@@ -140,9 +140,7 @@ if ($opt = $_item->getOptionByCode('additional_options')) {
                 <?= $block->getRowTotalHtml($_item) ?>
             <?php endif; ?>
         </td>
-    </tr>
-    <tr class="item-actions">
-        <td colspan="4">
+        <td class="col actions">
             <div class="actions-toolbar">
                 <?= /* @noEscape */ $block->getActions($_item) ?>
             </div>

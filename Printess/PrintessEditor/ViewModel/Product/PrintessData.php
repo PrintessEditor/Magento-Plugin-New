@@ -13,7 +13,8 @@ class PrintessData implements ArgumentInterface
     public function __construct(
         private readonly LocaleResolver  $localeResolver,
         private readonly CustomerSession $customerSession,
-    ) {}
+    ) {
+    }
 
     public function getLocale(): string
     {

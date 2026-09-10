@@ -240,19 +240,13 @@ class Reopen extends Action implements HttpPostActionInterface
 
     private function buildMergeTemplates(ProductInterface $product): array
     {
-        return array_values(array_map(
-            static function (array $r): array {
-                $entry = ['templateName' => (string) ($r['mergeTemplate'] ?? '')];
-                if (($r['mergeMode'] ?? '') !== '') {
-                    $entry['mergeMode'] = (string) $r['mergeMode'];
-                }
-                return $entry;
-            },
-            array_filter(
-                (array) ($product->getData('printess_merge_template') ?: []),
-                static fn($r): bool => is_array($r) && trim((string) ($r['mergeTemplate'] ?? '')) !== ''
-            )
-        ));
+        // Same conversion as addtocart.phtml: we store/administer a single merge template
+        // per product (varchar attribute), not vendor's multi-row array. getData() here
+        // returns a plain string for our schema, so build the zero-or-one-element array the
+        // editor JS expects directly, rather than assuming vendor's array/row shape.
+        $mergeTemplate = trim((string) $product->getData('printess_merge_template'));
+
+        return $mergeTemplate !== '' ? [['templateName' => $mergeTemplate]] : [];
     }
 
     private function decodeJsonAttribute(string $value): array
