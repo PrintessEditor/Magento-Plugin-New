@@ -57,6 +57,7 @@ define([
         require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessEditor) {
             PrintessEditor.openFromProduct({
                 shopToken: config.shopToken,
+                panelLoaderUrl: config.panelLoaderUrl,
                 templateName: config.templateName,
                 formId: config.formId,
                 variantOptions: config.variantOptions || [],

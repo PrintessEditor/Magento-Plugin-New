@@ -21,6 +21,8 @@ $_mergeTemplates = json_encode(array_values(array_map(
     )
 )));
 $_shopToken = $_config->getShopToken();
+$_panelLoaderUrl = $_config->getPanelLoaderUrl();
+$_slimLoaderUrl = $_config->getSlimLoaderUrl();
 $_isSlimUi  = $_template !== '' && $_shopToken !== '' && (bool)$_product->getData('printess_slim_ui');
 $_isPrintess = $_template !== '' && $_shopToken !== '' && !$_isSlimUi;
 $_slimUiFullEditorAllowed = $_isSlimUi && (bool)$_product->getData('printess_slim_ui_full_editor');
@@ -169,6 +171,8 @@ try {
 require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessEditor) {
     PrintessEditor.initSlimUi({
         shopToken:           <?= /* @noEscape */ json_encode($_shopToken) ?>,
+        slimLoaderUrl:       <?= /* @noEscape */ json_encode($_slimLoaderUrl) ?>,
+        panelLoaderUrl:      <?= /* @noEscape */ json_encode($_panelLoaderUrl) ?>,
         templateName:        <?= /* @noEscape */ json_encode($_template) ?>,
         formId:              'product_addtocart_form',
         variantOptions:      <?= /* @noEscape */ json_encode($_variantOptions) ?>,
@@ -231,6 +235,7 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
             "saveUrl": <?= /* @noEscape */ json_encode($block->getUrl('printess/project/save')) ?>,
             "projectsUrl": <?= /* @noEscape */ json_encode($block->getUrl('printess/project/index')) ?>,
             "shopToken": <?= /* @noEscape */ json_encode($_shopToken) ?>,
+            "panelLoaderUrl": <?= /* @noEscape */ json_encode($_panelLoaderUrl) ?>,
             "templateName": <?= /* @noEscape */ json_encode($_template) ?>,
             "formId": "product_addtocart_form",
             "locale": <?= /* @noEscape */ json_encode($_locale) ?>,

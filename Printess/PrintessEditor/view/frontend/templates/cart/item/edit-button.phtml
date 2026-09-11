@@ -20,6 +20,7 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
     document.getElementById('printess-edit-<?= /* @noEscape */ $uid ?>').addEventListener('click', function () {
         PrintessEditor.openFromCart({
             shopToken:  <?= /* @noEscape */ json_encode($itemData['shopToken']) ?>,
+            panelLoaderUrl: <?= /* @noEscape */ json_encode($itemData['panelLoaderUrl']) ?>,
             saveToken:  <?= /* @noEscape */ json_encode($itemData['saveToken']) ?>,
             itemId:     <?= /* @noEscape */ (int)$itemData['itemId'] ?>,
             updateUrl:  '<?= $block->escapeUrl($block->getUrl('printess/cart/update')) ?>',

@@ -78,6 +78,7 @@ class Open extends Action implements HttpPostActionInterface
                 'success' => true,
                 'config' => [
                     'shopToken' => $this->printessConfig->getShopToken(),
+                    'panelLoaderUrl' => $this->printessConfig->getPanelLoaderUrl(),
                     'templateName' => (string) $project->getData('save_token'),
                     'saveUrl' => $this->urlBuilder->getUrl('printess/project/save'),
                     'returnUrl' => $this->urlBuilder->getUrl('printess/project'),

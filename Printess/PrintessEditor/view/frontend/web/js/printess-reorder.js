@@ -81,6 +81,7 @@ define([
                     try {
                         openFromProduct({
                             shopToken: response.config.shopToken,
+                            panelLoaderUrl: response.config.panelLoaderUrl,
                             templateName: response.config.templateName,
                             formId: 'product_addtocart_form',
                             addToCartUrl: response.config.addToCartUrl,

@@ -66,6 +66,7 @@ class EditButton extends Generic
             'qty'          => (int)$item->getQty(),
             'saveToken'    => $this->getSaveToken(),
             'shopToken'    => $this->printessConfig->getShopToken(),
+            'panelLoaderUrl' => $this->printessConfig->getPanelLoaderUrl(),
             'addToCartUrl' => $this->cartHelper->getAddUrl($product),
             'deleteUrl'    => $this->cartHelper->getDeletePostJson($item),
         ];

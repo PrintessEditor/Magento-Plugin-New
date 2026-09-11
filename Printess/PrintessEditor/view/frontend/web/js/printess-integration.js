@@ -5,8 +5,8 @@
 define(['jquery'], function ($) {
     'use strict';
 
-    var PANEL_LOADER_URL = 'https://editor.printess.com/printess-editor/loader.js';
-    var SLIM_LOADER_URL = 'https://editor.printess.com/slim-ui.js';
+    var DEFAULT_PANEL_LOADER_URL = 'https://editor.printess.com/printess-editor/loader.js';
+    var DEFAULT_SLIM_LOADER_URL = 'https://editor.printess.com/slim-ui.js';
 
     var _panelLoaderPromise = null;
     var _slimApi = null;   // slim UI instance
@@ -440,9 +440,9 @@ define(['jquery'], function ($) {
         return null;
     }
 
-    function getPanelLoader() {
+    function getPanelLoader(url) {
         if (!_panelLoaderPromise) {
-            _panelLoaderPromise = import(PANEL_LOADER_URL);
+            _panelLoaderPromise = import(url || DEFAULT_PANEL_LOADER_URL);
         }
         return _panelLoaderPromise;
     }
@@ -844,7 +844,7 @@ define(['jquery'], function ($) {
             history.pushState({ printessEditor: true }, '');
         }
 
-        var loaderModule = await getPanelLoader();
+        var loaderModule = await getPanelLoader(opts.panelLoaderUrl);
         var panelRef = null;
         var loadCfg = {
             token: opts.shopToken,
@@ -1157,6 +1157,7 @@ define(['jquery'], function ($) {
             // console.warn('[Printess] openFromProduct', { variantOptions: variantOptions, customOptions: customOptions });
             var panelCfg = {
                 shopToken: cfg.shopToken,
+                panelLoaderUrl: cfg.panelLoaderUrl,
                 templateName: cfg.templateName,
                 formFields: mergePredefinedFormFields(cfg.predefinedFormFields, buildAutoFormFields(variantOptions, customOptions)),
                 variantOptions: variantOptions,
@@ -1218,7 +1219,7 @@ define(['jquery'], function ($) {
             var variantOptions = cfg.variantOptions || [];
             var customOptions = cfg.customOptions || [];
 
-            import(SLIM_LOADER_URL).then(function (slimModule) {
+            import(cfg.slimLoaderUrl || DEFAULT_SLIM_LOADER_URL).then(function (slimModule) {
                 var slimCfg = {
                     previewContainer: document.querySelector('.printess-preview'),
                     uiContainer: document.querySelector('.printess-ui'),
@@ -1365,6 +1366,7 @@ define(['jquery'], function ($) {
 
                 openPanelEditor({
                     shopToken: cfg.shopToken || _currentShopToken,
+                    panelLoaderUrl: cfg.panelLoaderUrl,
                     templateName: data.saveToken,
                     variantOptions: variantOptions,
                     customOptions: customOptions,
@@ -1405,6 +1407,7 @@ define(['jquery'], function ($) {
         openFromCart: function (cfg) {
             openPanelEditor({
                 shopToken: cfg.shopToken,
+                panelLoaderUrl: cfg.panelLoaderUrl,
                 templateName: cfg.saveToken,
                 onAddToBasket: function (newSaveToken, newThumbnailUrl) {
                     return new Promise(function (resolve, reject) {
