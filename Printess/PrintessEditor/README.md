@@ -62,6 +62,7 @@ php bin/magento cache:flush
 |---|---|---|
 | API & Token | Shop Token | Your Printess shop token |
 | Editor | Default Theme | Editor UI theme name |
+| Editor | Editor Version | Which build of the Printess editor to load (e.g. "nightly" for the current staging build). The "/v/" prefix is added automatically if omitted. Blank = current release version. Store-level. |
 | Editor | Print Settings | Default print settings name |
 | Production | Production Token | Token for production/fulfilment API calls |
 | Projects | Order Reminder Template | Email template for order reminder |

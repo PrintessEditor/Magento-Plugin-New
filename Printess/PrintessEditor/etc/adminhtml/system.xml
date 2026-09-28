@@ -28,6 +28,10 @@
                     <source_model>Printess\PrintessEditor\Model\Config\Source\EditorTheme</source_model>
                     <comment>Default theme for all Printess editors in this store. Can be overridden per product.</comment>
                 </field>
+                <field id="editor_version" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Editor Version</label>
+                    <comment>Which build of the Printess editor to load, e.g. "nightly" for the current staging build. The "/v/" prefix is added automatically if you leave it out. Leave blank to load the current release version.</comment>
+                </field>
             </group>
             <group id="production" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Print Settings</label>

@@ -6,6 +6,7 @@ define([
     function openEditor(config) {
         PrintessEditor.openFromProduct({
             shopToken: config.shopToken,
+            panelLoaderUrl: config.panelLoaderUrl,
             templateName: config.templateName,
             formId: 'product_addtocart_form',
             addToCartUrl: config.addToCartUrl || '',

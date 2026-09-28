@@ -54,7 +54,9 @@ define([
             this._lastLoadedTemplate = '';
             this.availableFields = ko.observableArray([]);
             this.loadingFields = ko.observable(false);
+            this.fieldsLoadComplete = ko.observable(false);
             this.fieldsError = ko.observable('');
+            this.hasTemplate = ko.observable(false);
             this.rows = ko.observableArray([]);
             this.availableFieldOptions = ko.computed(function () {
                 return [{value: '', label: '-- Select field --'}].concat(
@@ -62,6 +64,10 @@ define([
                         return {value: f.name, label: f.display || f.name};
                     })
                 );
+            }, this);
+            this.hasWarnings = ko.computed(function () {
+                if (!this.fieldsLoadComplete()) { return false; }
+                return this.rows().some(function (r) { return r.warning && r.warning() !== null; });
             }, this);
             return this;
         },
@@ -90,11 +96,21 @@ define([
         onTemplateChange: function (templateName) {
             if (templateName === this._lastLoadedTemplate) { return; }
             this._lastLoadedTemplate = templateName;
+            this.hasTemplate(!!templateName);
             this.availableFields([]);
             this.fieldsError('');
+            this.fieldsLoadComplete(false);
             if (templateName) {
                 this._loadFormFields(templateName);
             }
+        },
+
+        checkConfig: function () {
+            if (!this._lastLoadedTemplate || this.loadingFields()) { return; }
+            this.availableFields([]);
+            this.fieldsError('');
+            this.fieldsLoadComplete(false);
+            this._loadFormFields(this._lastLoadedTemplate);
         },
 
         _loadFormFields: function (templateName) {
@@ -110,6 +126,7 @@ define([
                         (typeof res.error === 'string' ? res.error : null) || 'Could not load form fields.'
                     );
                 }
+                self.fieldsLoadComplete(true);
             });
         },
 
@@ -124,6 +141,7 @@ define([
             var self = this;
             var fieldName = ko.observable(name);
             var fieldValue = ko.observable(val);
+
             var entries = ko.computed(function () {
                 var n = fieldName();
                 if (!n) { return []; }
@@ -142,6 +160,25 @@ define([
                 return [];
             });
 
+            // warning is only evaluated once the field list has fully loaded.
+            // type 'missing'      → field name no longer exists in the template
+            // type 'priceRelevant'→ field is marked price-relevant; admin should
+            //                       ensure custom pricing is configured accordingly
+            var warning = ko.computed(function () {
+                if (!self.fieldsLoadComplete()) { return null; }
+                var n = fieldName();
+                if (!n) { return null; }
+                var fields = self.availableFields();
+                for (var i = 0; i < fields.length; i++) {
+                    if (fields[i].name === n) {
+                        return fields[i].priceRelevant
+                            ? {type: 'priceRelevant', text: 'This field is price-relevant in the Printess template. Ensure custom pricing is configured.'}
+                            : null;
+                    }
+                }
+                return {type: 'missing', text: 'Field “' + n + '” was not found in the current template — it may have been renamed or removed.'};
+            });
+
             entries.subscribe(function (newEntries) {
                 if (newEntries.length) {
                     var current = fieldValue();
@@ -150,7 +187,7 @@ define([
                 }
             });
 
-            return {fieldName: fieldName, fieldValue: fieldValue, entries: entries};
+            return {fieldName: fieldName, fieldValue: fieldValue, entries: entries, warning: warning};
         },
 
         addRow: function () {

@@ -54,12 +54,8 @@ class PrintessTemplateModifier extends AbstractModifier
             $groupChildrenPath = implode('/', array_slice($parts, 0, -3));   // …/GroupName/children
             $containerPath     = implode('/', array_slice($parts, 0, -2));   // …/container_printess_merge_template
 
-            // Hide the original container (and the field inside it)
-            $meta = $this->arrayManager->merge(
-                $containerPath . '/arguments/data/config',
-                $meta,
-                ['visible' => false, 'disabled' => true]
-            );
+            // Remove the original auto-generated container entirely
+            $meta = $this->arrayManager->remove($containerPath, $meta);
 
             // Insert a separate fieldset with a dynamic list of merge templates
             $meta = $this->arrayManager->set(

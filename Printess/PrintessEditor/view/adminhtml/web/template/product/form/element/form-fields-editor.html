@@ -1,5 +1,6 @@
 <style>
-.pff-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:6px}
+.pff-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:2px}
+.pff-row-wrap{margin-bottom:8px}
 .pff-col-name{flex:1;min-width:0}
 .pff-col-value{flex:1;min-width:0}
 .pff-col-del{flex:0 0 auto}
@@ -8,6 +9,9 @@
 .pff-err{font-size:12px;color:#c00;margin-bottom:6px}
 .pff-col-del button{padding:5px 10px;background:#f0f0f0;border:1px solid #bbb;border-radius:3px;cursor:pointer;font-size:14px;line-height:1;color:#555}
 .pff-col-del button:hover{background:#e0e0e0;color:#333}
+.pff-warning{font-size:12px;padding:4px 8px;border-radius:3px;margin-top:3px}
+.pff-warning--missing{background:#fff3cd;border:1px solid #f0c040;color:#856404}
+.pff-warning--priceRelevant{background:#cce5ff;border:1px solid #79b8f3;color:#004085}
 </style>
 
 <!-- ko if: loadingFields() -->
@@ -26,51 +30,70 @@
 <!-- /ko -->
 
 <!-- ko foreach: rows() -->
-<div class="pff-row">
-    <div class="pff-col-name">
-        <!-- ko if: $parent.availableFields().length -->
-        <select class="admin__control-select"
-                data-bind="value: fieldName,
-                           options: $parent.availableFieldOptions(),
-                           optionsValue: 'value',
-                           optionsText: 'label'">
-        </select>
-        <!-- /ko -->
-        <!-- ko ifnot: $parent.availableFields().length -->
-        <input type="text" class="admin__control-text"
-               placeholder="Form field name"
-               data-bind="value: fieldName, valueUpdate: 'input'"/>
-        <!-- /ko -->
+<div class="pff-row-wrap">
+    <div class="pff-row">
+        <div class="pff-col-name">
+            <!-- ko if: $parent.availableFields().length -->
+            <select class="admin__control-select"
+                    data-bind="value: fieldName,
+                               options: $parent.availableFieldOptions(),
+                               optionsValue: 'value',
+                               optionsText: 'label'">
+            </select>
+            <!-- /ko -->
+            <!-- ko ifnot: $parent.availableFields().length -->
+            <input type="text" class="admin__control-text"
+                   placeholder="Form field name"
+                   data-bind="value: fieldName, valueUpdate: 'input'"/>
+            <!-- /ko -->
+        </div>
+        <div class="pff-col-value">
+            <!-- ko if: entries().length -->
+            <select class="admin__control-select"
+                    data-bind="value: fieldValue,
+                               options: entries(),
+                               optionsValue: 'key',
+                               optionsText: 'displayLabel',
+                               optionsCaption: '-- Select value --'">
+            </select>
+            <!-- /ko -->
+            <!-- ko ifnot: entries().length -->
+            <input type="text" class="admin__control-text"
+                   placeholder="Value"
+                   data-bind="value: fieldValue, valueUpdate: 'input'"/>
+            <!-- /ko -->
+        </div>
+        <div class="pff-col-del">
+            <button type="button"
+                    title="Remove"
+                    data-bind="click: function() { $parent.removeRow($index()); }">
+                &times;
+            </button>
+        </div>
     </div>
-    <div class="pff-col-value">
-        <!-- ko if: entries().length -->
-        <select class="admin__control-select"
-                data-bind="value: fieldValue,
-                           options: entries(),
-                           optionsValue: 'key',
-                           optionsText: 'displayLabel',
-                           optionsCaption: '-- Select value --'">
-        </select>
-        <!-- /ko -->
-        <!-- ko ifnot: entries().length -->
-        <input type="text" class="admin__control-text"
-               placeholder="Value"
-               data-bind="value: fieldValue, valueUpdate: 'input'"/>
-        <!-- /ko -->
+    <!-- ko if: warning() -->
+    <div class="pff-warning"
+         data-bind="css: 'pff-warning--' + warning().type,
+                    text: warning().text">
     </div>
-    <div class="pff-col-del">
-        <button type="button"
-                title="Remove"
-                data-bind="click: function() { $parent.removeRow($index()); }">
-            &times;
-        </button>
-    </div>
+    <!-- /ko -->
 </div>
 <!-- /ko -->
 
-<button type="button"
-        class="action-secondary scalable"
-        style="margin-top:6px"
-        data-bind="click: addRow">
-    <span>Add Form Field</span>
-</button>
+<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:6px">
+    <button type="button"
+            class="action-secondary scalable"
+            data-bind="click: addRow">
+        <span>Add Form Field</span>
+    </button>
+    <!-- ko if: hasTemplate() -->
+    <button type="button"
+            class="action-secondary scalable"
+            data-bind="click: checkConfig, disable: loadingFields()">
+        <span data-bind="text: loadingFields() ? 'Checking…' : 'Check Printess Config'"></span>
+    </button>
+    <!-- /ko -->
+    <!-- ko if: fieldsLoadComplete() && !hasWarnings() && rows().length -->
+    <span style="color:#2e7d32;font-size:12px;font-weight:600">&#10003; All configured fields are aligned with the template</span>
+    <!-- /ko -->
+</div>

@@ -141,6 +141,7 @@ class Reopen extends Action implements HttpPostActionInterface
             'active'  => true,
             'config'  => [
                 'shopToken'           => $this->printessConfig->getShopToken(),
+                'panelLoaderUrl'      => $this->printessConfig->getPanelLoaderUrl(),
                 'templateName'        => $saveToken,
                 'addToCartUrl'        => $this->urlBuilder->getUrl('checkout/cart/add', ['product' => (int) $product->getId()]),
                 'productId'           => (string) $product->getId(),
