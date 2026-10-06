@@ -891,7 +891,11 @@ define(['jquery'], function ($) {
         };
 
         if (opts.theme) loadCfg.theme = opts.theme;
-        if (opts.magicPhotobookTheme) loadCfg.magicPhotobookTheme = opts.magicPhotobookTheme;
+        if (opts.magicPhotobookTheme) {
+            var themeField = {name: 'PHOTOBOOK_THEME', value: opts.magicPhotobookTheme};
+            loadCfg.formFields = (loadCfg.formFields || []).concat([themeField]);
+            _currentFormFields['PHOTOBOOK_THEME'] = opts.magicPhotobookTheme;
+        }
         if (opts.printSettings) loadCfg.printSettings = opts.printSettings;
         if (opts.mergeTemplates && opts.mergeTemplates.length) loadCfg.attach = { mergeTemplates: opts.mergeTemplates };
         // Printess native save/load callbacks
@@ -1232,7 +1236,9 @@ define(['jquery'], function ($) {
                 };
 
                 if (cfg.theme) slimCfg.theme = cfg.theme;
-                if (cfg.magicPhotobookTheme) slimCfg.magicPhotobookTheme = cfg.magicPhotobookTheme;
+                if (cfg.magicPhotobookTheme) {
+                    slimCfg.formFields = (slimCfg.formFields || []).concat([{name: 'PHOTOBOOK_THEME', value: cfg.magicPhotobookTheme}]);
+                }
                 if (cfg.printSettings) slimCfg.printSettings = cfg.printSettings;
                 if (cfg.mergeTemplates && cfg.mergeTemplates.length) slimCfg.attach = { mergeTemplates: cfg.mergeTemplates };
 
