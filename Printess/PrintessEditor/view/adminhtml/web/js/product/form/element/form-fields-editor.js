@@ -38,6 +38,7 @@ define([
             template: 'ui/form/field',
             elementTmpl: 'Printess_PrintessEditor/product/form/element/form-fields-editor',
             endpointFormFields: '',
+            endpointGenerateOptions: '',
             currentTemplateName: '',
             imports: {
                 currentTemplateName: '${ $.provider }:data.product.printess_template'
@@ -142,6 +143,18 @@ define([
             var fieldName = ko.observable(name);
             var fieldValue = ko.observable(val);
 
+            var generating = ko.observable(false);
+
+            var fieldDisplay = ko.computed(function () {
+                var n = fieldName();
+                if (!n) { return ''; }
+                var fields = self.availableFields();
+                for (var i = 0; i < fields.length; i++) {
+                    if (fields[i].name === n) { return fields[i].display || n; }
+                }
+                return n;
+            });
+
             var entries = ko.computed(function () {
                 var n = fieldName();
                 if (!n) { return []; }
@@ -187,7 +200,40 @@ define([
                 }
             });
 
-            return {fieldName: fieldName, fieldValue: fieldValue, entries: entries, warning: warning};
+            return {fieldName: fieldName, fieldValue: fieldValue, fieldDisplay: fieldDisplay, entries: entries, warning: warning, generating: generating};
+        },
+
+        generateCustomisableOptions: function (row) {
+            var self = this;
+            var entries = row.entries();
+            if (!entries.length || row.generating()) { return; }
+
+            var productId = parseInt((window.location.pathname.match(/\/id\/(\d+)/) || [])[1] || '0', 10);
+            if (!productId) {
+                alert('Please save the product first before generating Customisable Options.');
+                return;
+            }
+
+            var title = row.fieldDisplay() || row.fieldName();
+            if (!confirm(
+                'This will create a "Drop-down" Customisable Option titled "' + title + '" ' +
+                'with ' + entries.length + ' value(s).\n\n' +
+                'The page will reload after creation. Any unsaved changes will be lost.\n\nContinue?'
+            )) { return; }
+
+            row.generating(true);
+            proxyPost(self.endpointGenerateOptions, {
+                productId: productId,
+                title: title,
+                entries: entries.map(function (e) { return {key: e.key, label: e.displayLabel}; })
+            }).then(function (res) {
+                row.generating(false);
+                if (res.ok && res.data && res.data.success) {
+                    window.location.reload();
+                } else {
+                    alert('Could not generate Customisable Options: ' + (res.error || 'Unknown error'));
+                }
+            });
         },
 
         addRow: function () {

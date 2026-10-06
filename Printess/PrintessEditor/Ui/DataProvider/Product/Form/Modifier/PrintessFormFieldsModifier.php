@@ -43,9 +43,10 @@ class PrintessFormFieldsModifier extends AbstractModifier
             [
                 'componentType'      => 'field',
                 'formElement'        => 'input',
-                'component'          => 'Printess_PrintessEditor/js/product/form/element/form-fields-editor',
-                'elementTmpl'        => 'Printess_PrintessEditor/product/form/element/form-fields-editor',
-                'endpointFormFields' => $this->backendUrl->getUrl('printess/api/formfields'),
+                'component'                  => 'Printess_PrintessEditor/js/product/form/element/form-fields-editor',
+                'elementTmpl'                => 'Printess_PrintessEditor/product/form/element/form-fields-editor',
+                'endpointFormFields'         => $this->backendUrl->getUrl('printess/api/formfields'),
+                'endpointGenerateOptions'    => $this->backendUrl->getUrl('printess/api/generatecustomoptions'),
                 'additionalClasses'  => 'admin__field-wide',
                 'notice'             => __(
                     'Form field name/value pairs passed to the Printess editor when the product is opened. '

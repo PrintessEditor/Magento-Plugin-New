@@ -71,6 +71,16 @@
             </button>
         </div>
     </div>
+    <!-- ko if: entries().length -->
+    <div style="margin-top:4px">
+        <button type="button"
+                class="action-secondary scalable"
+                data-bind="click: function() { $parent.generateCustomisableOptions($data); },
+                           disable: generating()">
+            <span data-bind="text: generating() ? 'Generating…' : 'Generate Customisable Options'"></span>
+        </button>
+    </div>
+    <!-- /ko -->
     <!-- ko if: warning() -->
     <div class="pff-warning"
          data-bind="css: 'pff-warning--' + warning().type,
@@ -80,7 +90,7 @@
 </div>
 <!-- /ko -->
 
-<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:6px">
+<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:14px">
     <button type="button"
             class="action-secondary scalable"
             data-bind="click: addRow">
