@@ -42,6 +42,7 @@ define([
         PrintessEditor.openFromProduct({
             shopToken: config.shopToken,
             templateName: config.templateName,
+            restoreSavedDesign: true,
             formId: 'product_addtocart_form',
             addToCartUrl: config.addToCartUrl || '',
             productId: config.productId || '',
@@ -55,7 +56,7 @@ define([
             theme: config.theme,
             magicPhotobookTheme: config.magicPhotobookTheme,
             printSettings: config.printSettings,
-            mergeTemplates: config.mergeTemplates,
+            mergeTemplate: config.mergeTemplate,
             shopUserId: config.shopUserId || '',
             productName: config.productName || '',
             productUrl: config.productUrl || '',

@@ -30,7 +30,7 @@
     <div class="pff-col-name">
         <!-- ko if: $parent.availableFields().length -->
         <select class="admin__control-select"
-                data-bind="value: fieldName,
+                data-bind="disable: $parent.disabled, value: fieldName,
                            options: $parent.availableFieldOptions(),
                            optionsValue: 'value',
                            optionsText: 'label'">
@@ -39,13 +39,13 @@
         <!-- ko ifnot: $parent.availableFields().length -->
         <input type="text" class="admin__control-text"
                placeholder="Form field name"
-               data-bind="value: fieldName, valueUpdate: 'input'"/>
+               data-bind="disable: $parent.disabled, value: fieldName, valueUpdate: 'input'"/>
         <!-- /ko -->
     </div>
     <div class="pff-col-value">
         <!-- ko if: entries().length -->
         <select class="admin__control-select"
-                data-bind="value: fieldValue,
+                data-bind="disable: $parent.disabled, value: fieldValue,
                            options: entries(),
                            optionsValue: 'key',
                            optionsText: 'displayLabel',
@@ -55,13 +55,13 @@
         <!-- ko ifnot: entries().length -->
         <input type="text" class="admin__control-text"
                placeholder="Value"
-               data-bind="value: fieldValue, valueUpdate: 'input'"/>
+               data-bind="disable: $parent.disabled, value: fieldValue, valueUpdate: 'input'"/>
         <!-- /ko -->
     </div>
     <div class="pff-col-del">
         <button type="button"
                 title="Remove"
-                data-bind="click: function() { $parent.removeRow($index()); }">
+                data-bind="disable: $parent.disabled, click: function() { $parent.removeRow($index()); }">
             &times;
         </button>
     </div>
@@ -71,6 +71,6 @@
 <button type="button"
         class="action-secondary scalable"
         style="margin-top:6px"
-        data-bind="click: addRow">
+        data-bind="disable: disabled, click: addRow">
     <span>Add Form Field</span>
 </button>

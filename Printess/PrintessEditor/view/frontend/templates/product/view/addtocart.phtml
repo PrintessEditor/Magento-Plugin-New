@@ -10,10 +10,9 @@ $_store        = $block->getProduct()->getStore();
 $_currencyCode = $_store->getCurrentCurrencyCode();
 $_template      = (string)($_product->getData('printess_template') ?? '');
 $_mergeTemplate = (string)($_product->getData('printess_merge_template') ?? '');
-// JS-facing shape only: vendor's editor JS takes an array of merge templates. We still
-// store/administer a single merge template per product (see AddMergeTemplateAttribute),
-// so this is always a zero- or one-element array built from that one attribute.
-$_mergeTemplates = json_encode($_mergeTemplate !== '' ? [['templateName' => $_mergeTemplate]] : []);
+$_predefinedFormFields = json_encode(\Printess\PrintessEditor\Model\Product\EditorSettings::formFields(
+    $_product->getData('printess_form_fields')
+));
 $_shopToken = $_config->getShopToken();
 $_isSlimUi  = $_template !== '' && $_shopToken !== '' && (bool)$_product->getData('printess_slim_ui');
 $_isPrintess = $_template !== '' && $_shopToken !== '' && !$_isSlimUi;
@@ -184,7 +183,8 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
         theme:               <?= /* @noEscape */ json_encode($_theme) ?>,
         magicPhotobookTheme: <?= /* @noEscape */ json_encode($_magicPhotobookTheme) ?>,
         printSettings:       <?= /* @noEscape */ json_encode($_printSettings) ?>,
-        mergeTemplates:      <?= /* @noEscape */ $_mergeTemplates ?>,
+        mergeTemplate:       <?= /* @noEscape */ json_encode($_mergeTemplate) ?>,
+        predefinedFormFields: <?= /* @noEscape */ $_predefinedFormFields ?>,
         namePrompt:          <?= /* @noEscape */ json_encode($_namePrompt) ?>
     });
     document.getElementById('product-addtocart-button').addEventListener('click', function () {
@@ -231,7 +231,6 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
             "productId": <?= /* @noEscape */ json_encode((string)$_product->getId()) ?>,
             "productName": <?= /* @noEscape */ json_encode((string)$_product->getName()) ?>,
             "productUrl": <?= /* @noEscape */ json_encode((string)$_product->getProductUrl()) ?>,
-            "shopUserId": <?= /* @noEscape */ json_encode($_printessData->getShopUserId()) ?>,
             "saveUrl": <?= /* @noEscape */ json_encode($block->getUrl('printess/project/save')) ?>,
             "projectsUrl": <?= /* @noEscape */ json_encode($block->getUrl('printess/project/index')) ?>,
             "shopToken": <?= /* @noEscape */ json_encode($_shopToken) ?>,
@@ -246,7 +245,8 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
             "theme": <?= /* @noEscape */ json_encode($_theme) ?>,
             "magicPhotobookTheme": <?= /* @noEscape */ json_encode($_magicPhotobookTheme) ?>,
             "printSettings": <?= /* @noEscape */ json_encode($_printSettings) ?>,
-            "mergeTemplates": <?= /* @noEscape */ $_mergeTemplates ?>,
+            "mergeTemplate": <?= /* @noEscape */ json_encode($_mergeTemplate) ?>,
+            "predefinedFormFields": <?= /* @noEscape */ $_predefinedFormFields ?>,
             "namePrompt":    <?= /* @noEscape */ json_encode($_namePrompt) ?>,
             "loginPopup":    <?= /* @noEscape */ json_encode($_loginPopup) ?>
         }

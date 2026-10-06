@@ -113,7 +113,7 @@ class PrintessApi
         }
 
         try {
-            $result = $this->postList('/savetoken/list', ['saveToken' => $saveToken]);
+            $result = $this->postArray('/shop/template/info', ['id' => $saveToken]);
         } catch (\Throwable $e) {
             return false;
         }
@@ -121,40 +121,28 @@ class PrintessApi
         return $this->isTokenRecordActive($result);
     }
 
-    /**
-     * Interprets the decoded /savetoken/list response. The exact shape wasn't verified against
-     * the live API ahead of this change, so this accepts several plausible shapes defensively:
-     * a bare list of matching tokens, an object wrapping the list under a common key, or a
-     * single record carrying an explicit active/expired flag. Any other non-empty payload is
-     * treated as "found" (active); an empty result is treated as "not found" (inactive).
-     */
+    /** Only documented metadata proves that a saved design is still available. */
     private function isTokenRecordActive(array $result): bool
     {
-        if ($result === []) {
+        if (isset($result['c']) || !array_key_exists('expiresOn', $result)) {
             return false;
         }
-
-        if (array_is_list($result)) {
-            return count($result) > 0;
+        if ($result['expiresOn'] === null) {
+            return true;
         }
-
-        foreach (['items', 'saveTokens', 'data', 'results'] as $key) {
-            if (isset($result[$key]) && is_array($result[$key])) {
-                return count($result[$key]) > 0;
+        if (!is_string($result['expiresOn']) ||
+            !preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/', $result['expiresOn'])) {
+            return false;
+        }
+        try {
+            $expiresOn = new \DateTimeImmutable($result['expiresOn'], new \DateTimeZone('UTC'));
+            if (\DateTimeImmutable::getLastErrors() !== false) {
+                return false;
             }
+        } catch (\Exception $e) {
+            return false;
         }
-
-        if (array_key_exists('expired', $result)) {
-            return !$result['expired'];
-        }
-
-        foreach (['active', 'isActive', 'valid'] as $key) {
-            if (array_key_exists($key, $result)) {
-                return (bool) $result[$key];
-            }
-        }
-
-        return true;
+        return $expiresOn > new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
     }
 
     /**
@@ -162,7 +150,7 @@ class PrintessApi
      * 404 as an empty (not found) result rather than throwing — an unknown/expired save
      * token is an expected outcome here, not an API error.
      */
-    private function postList(string $path, array $payload): array
+    private function postArray(string $path, array $payload): array
     {
         $url  = $this->apiUrl . $path;
         $body = json_encode($payload);

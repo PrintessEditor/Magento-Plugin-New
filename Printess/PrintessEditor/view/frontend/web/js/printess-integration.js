@@ -24,6 +24,7 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
     var _selectedOptionPrices = {};  // optionId -> price of currently selected value (used when no Magento price box)
     var _activePanelOpts = null;     // mutable ref to the current panel config — callbacks read from this so re-opening a different project works correctly
     var _panelLoadedTemplate = '';   // save token currently loaded in the persistent editor instance
+    var _panelLoadedPhotobookTheme = ''; // product default used for the current editor load
     var _namePromptConfig    = {};   // save-project-name popup config from system config
 
     var _cartLoaderOverlay = null;
@@ -74,9 +75,9 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
             return Promise.resolve('');
         }
 
-        var promptText   = esc(_namePromptConfig.text        || 'Give this project a name so you can manage it later.');
-        var placeholder  = esc(_namePromptConfig.placeholder  || 'e.g. My Wedding Album');
-        var actionLabel  = esc(_namePromptConfig.actionLabel  || 'Save name');
+        var promptText   = escapeHtml(_namePromptConfig.text        || 'Give this project a name so you can manage it later.');
+        var placeholder  = escapeHtml(_namePromptConfig.placeholder  || 'e.g. My Wedding Album');
+        var actionLabel  = escapeHtml(_namePromptConfig.actionLabel  || 'Save name');
 
         return new Promise(function (resolve) {
             var overlay = document.createElement('div');
@@ -149,6 +150,7 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
         } catch (e) { }
         _panelEditorRef = null;
         _panelLoadedTemplate = '';
+        _panelLoadedPhotobookTheme = '';
     }
 
     // Intercept the browser back button while the panel editor is open.
@@ -430,6 +432,17 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
         (predefined || []).forEach(function (ff) { if (ff.name) map[ff.name] = ff.value; });
         (auto || []).forEach(function (ff) { if (ff.name) map[ff.name] = ff.value; });
         return Object.keys(map).map(function (k) { return { name: k, value: map[k] }; });
+    }
+
+    // Printess selects photobook layouts through this hidden form field, not a
+    // magicPhotobookTheme loader parameter. Preserve an explicitly supplied value
+    // (for example, the customer's theme restored from a saved cart item).
+    function withPhotobookTheme(formFields, theme) {
+        var fields = (formFields || []).slice();
+        if (theme && !fields.some(function (ff) { return ff.name === 'PHOTOBOOK_THEME'; })) {
+            fields.push({ name: 'PHOTOBOOK_THEME', value: theme });
+        }
+        return fields;
     }
 
     function findMatchingVariantAttr(variantOptions, fieldName, fieldLabel) {
@@ -753,6 +766,8 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
     }
 
     async function openPanelEditor(opts) {
+        var formFields = opts.restoreSavedDesign ? (opts.formFields || []) :
+            withPhotobookTheme(opts.formFields, opts.magicPhotobookTheme);
         _currentTemplateName = opts.templateName || '';
         _currentShopToken = opts.shopToken || '';
         _activePanelOpts = opts; // always update so callbacks dispatch to the current project
@@ -776,8 +791,20 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
 
                     ui.show();
 
-                    if (opts.templateName && opts.templateName !== _panelLoadedTemplate) {
-                        if (api && typeof api.loadTemplate === 'function') {
+                    if (opts.templateName && (opts.templateName !== _panelLoadedTemplate ||
+                        (opts.magicPhotobookTheme || '') !== _panelLoadedPhotobookTheme)) {
+                        if (api && typeof api.loadTemplateAndFormFields === 'function') {
+                            await api.loadTemplateAndFormFields(
+                                opts.templateName, !opts.restoreSavedDesign && opts.mergeTemplate ? [{ templateName: opts.mergeTemplate }] : [], formFields,
+                                null, null, false, 'published'
+                            );
+                            _panelLoadedTemplate = opts.templateName;
+                            _panelLoadedPhotobookTheme = opts.magicPhotobookTheme || '';
+                        } else if (opts.magicPhotobookTheme || _panelLoadedPhotobookTheme) {
+                            // Older API: fall through to a fresh loader call so the
+                            // selected theme is still applied through formFields.
+                            throw new Error('Printess: theme switch requires a fresh editor load');
+                        } else if (api && typeof api.loadTemplate === 'function') {
                             await api.loadTemplate(opts.templateName);
                             _panelLoadedTemplate = opts.templateName;
                         }
@@ -847,8 +874,8 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
 
         // Seed form fields from the initial values passed to Printess so the first
         // priceChangeCallback fires with the correct field state.
-        if (opts.formFields) {
-            opts.formFields.forEach(function (ff) {
+        if (formFields.length) {
+            formFields.forEach(function (ff) {
                 _currentFormFields[ff.name] = ff.value;
             });
         }
@@ -873,8 +900,8 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
                 return activeOpts.onAddToBasket(saveToken, thumbnailUrl, panelRef && panelRef.api ? panelRef.api : null);
             }
         };
-        if (opts.formFields && opts.formFields.length) {
-            loadCfg.formFields = opts.formFields;
+        if (formFields.length) {
+            loadCfg.formFields = formFields;
         }
 
         var variantOptions = opts.variantOptions || [];
@@ -906,9 +933,8 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
         };
 
         if (opts.theme) loadCfg.theme = opts.theme;
-        if (opts.magicPhotobookTheme) loadCfg.magicPhotobookTheme = opts.magicPhotobookTheme;
         if (opts.printSettings) loadCfg.printSettings = opts.printSettings;
-        if (opts.mergeTemplates && opts.mergeTemplates.length) loadCfg.attach = { mergeTemplates: opts.mergeTemplates };
+        if (!opts.restoreSavedDesign && opts.mergeTemplate) loadCfg.attach = { mergeTemplates: [{ templateName: opts.mergeTemplate }] };
         if (typeof opts.showSaveAndCloseButton === 'boolean') {
             loadCfg.showSaveAndCloseButton = opts.showSaveAndCloseButton;
         }
@@ -944,6 +970,7 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
         panelRef = await loaderModule.load(loadCfg);
         _panelEditorRef = panelRef;
         _panelLoadedTemplate = opts.templateName || '';
+        _panelLoadedPhotobookTheme = opts.magicPhotobookTheme || '';
         var resolvedMinPages = await resolveMinPagesFromApi(
             panelRef && panelRef.api ? panelRef.api : panelRef,
             opts.templateName,
@@ -1098,13 +1125,14 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
             var panelCfg = {
                 shopToken: cfg.shopToken,
                 templateName: cfg.templateName,
+                restoreSavedDesign: cfg.restoreSavedDesign || false,
                 formFields: mergePredefinedFormFields(cfg.predefinedFormFields, buildAutoFormFields(variantOptions, customOptions)),
                 variantOptions: variantOptions,
                 customOptions: customOptions,
                 theme: cfg.theme,
                 magicPhotobookTheme: cfg.magicPhotobookTheme,
                 printSettings: cfg.printSettings,
-                mergeTemplates: cfg.mergeTemplates,
+                mergeTemplate: cfg.mergeTemplate,
                 pagePricing: cfg.pagePricing || [],
                 currencyCode: cfg.currencyCode,
                 locale: cfg.locale,
@@ -1139,6 +1167,8 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
                     return postFormToCart(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef);
                 }
             };
+            panelCfg.saveTemplateCallback = cfg.saveTemplateCallback;
+            panelCfg.loadTemplateButtonCallback = cfg.loadTemplateButtonCallback;
             openPanelEditor(panelCfg);
         },
 
@@ -1176,13 +1206,15 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
                     shopToken: cfg.shopToken,
                     templateName: cfg.templateName,
                     published: true,
-                    formFields: mergePredefinedFormFields(cfg.predefinedFormFields, buildAutoFormFields(variantOptions, customOptions))
+                    formFields: withPhotobookTheme(
+                        mergePredefinedFormFields(cfg.predefinedFormFields, buildAutoFormFields(variantOptions, customOptions)),
+                        cfg.magicPhotobookTheme
+                    )
                 };
 
                 if (cfg.theme) slimCfg.theme = cfg.theme;
-                if (cfg.magicPhotobookTheme) slimCfg.magicPhotobookTheme = cfg.magicPhotobookTheme;
                 if (cfg.printSettings) slimCfg.printSettings = cfg.printSettings;
-                if (cfg.mergeTemplates && cfg.mergeTemplates.length) slimCfg.attach = { mergeTemplates: cfg.mergeTemplates };
+                if (cfg.mergeTemplate) slimCfg.attach = { mergeTemplates: [{ templateName: cfg.mergeTemplate }] };
 
                 if (variantOptions.length || customOptions.length) {
                     slimCfg.formFieldChangedCallback = function (fieldName, value, tag, fieldLabel) {
@@ -1315,12 +1347,13 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
                 openPanelEditor({
                     shopToken: cfg.shopToken || _currentShopToken,
                     templateName: data.saveToken,
+                    restoreSavedDesign: true,
                     variantOptions: variantOptions,
                     customOptions: customOptions,
                     theme: cfg.theme,
                     magicPhotobookTheme: cfg.magicPhotobookTheme,
                     printSettings: cfg.printSettings,
-                    mergeTemplates: cfg.mergeTemplates,
+                    mergeTemplate: cfg.mergeTemplate,
                     pagePricing: cfg.pagePricing || [],
                     basePrice: cfg.basePrice || 0,
                     currencyCode: cfg.currencyCode,
@@ -1355,6 +1388,7 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
             openPanelEditor({
                 shopToken:           cfg.shopToken,
                 templateName:        cfg.saveToken,
+                restoreSavedDesign:  true,
                 basePrice:           cfg.basePrice || 0,
                 customOptions:       cfg.customOptions || [],
                 formFields:          cfg.formFields || [],

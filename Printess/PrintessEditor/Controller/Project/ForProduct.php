@@ -58,7 +58,7 @@ class ForProduct extends Action implements HttpPostActionInterface, CsrfAwareAct
 
         $collection->addFieldToFilter(
             'expires_at',
-            [['null' => true], ['gteq' => $now]]
+            [['null' => true], ['gt' => $now]]
         );
         $collection->setOrder('updated_at', 'DESC');
         $collection->setPageSize(50);

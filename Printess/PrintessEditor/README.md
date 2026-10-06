@@ -81,8 +81,9 @@ php bin/magento cache:flush
 | `printess_product_btn_label` | Custom label for the Personalise button |
 | `printess_theme` | Per-product theme override |
 | `printess_print_settings` | Per-product print settings override |
-| `printess_merge_template` | Merge template name |
-| `printess_magic_photobook_theme` | Magic photobook theme |
+| `printess_form_fields` | Predefined form field names/values; Magento variant and option selections take precedence |
+| `printess_merge_template` | Optional single merge-template name |
+| `printess_magic_photobook_theme` | Preselects the Magic Photobook layout theme via the `PHOTOBOOK_THEME` form field. Requires a Magic Photobook template and Panel UI. On grouped products, set this on the child product. An explicitly supplied `PHOTOBOOK_THEME` form field takes precedence. |
 | `printess_page_pricing` | JSON array for per-page pricing rules |
 
 ---
@@ -166,3 +167,21 @@ saveTemplateCallback(saveToken, type, thumbnailUrl)
 // "save"  → user pressed Save, stay in editor
 // "close" → user pressed Save & Quit, redirect to My Projects
 ```
+
+## Validation and deployment for editor settings
+
+Run the focused regression checks from the Magento root:
+
+```sh
+node app/code/Printess/PrintessEditor/Test/Regression/editor-flows.cjs
+php app/code/Printess/PrintessEditor/Test/Regression/attribute-and-token.php
+```
+
+Deploy using the normal project workflow: apply data patches with `setup:upgrade`,
+recompile DI, deploy changed admin/frontend static assets, and clean configuration,
+EAV and full-page caches. Saved artwork retains its own photobook theme.
+
+Verify the admin template picker, predefined fields and Use Default
+checkbox in a store view. On the storefront, verify Save / Save & Close, grouped-product
+selection, Slim-to-Panel switching and reordering an active and expired design. Token
+checks use `/shop/template/info` with `id` and the documented `expiresOn` metadata.

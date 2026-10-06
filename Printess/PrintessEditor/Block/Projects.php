@@ -28,6 +28,11 @@ class Projects extends Template
 
         $this->projects = $collectionFactory->create();
         $this->projects->addFieldToFilter('customer_id', (int) $customerSession->getCustomerId());
+        // Filter before the pager calculates totals; cleanup may retain ordered projects.
+        $this->projects->addFieldToFilter(
+            'expires_at',
+            [['null' => true], ['gt' => $this->dateTime->gmtDate()]]
+        );
         $this->projects->setOrder('updated_at', 'DESC');
     }
 

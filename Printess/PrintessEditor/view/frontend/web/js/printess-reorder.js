@@ -82,6 +82,7 @@ define([
                         openFromProduct({
                             shopToken: response.config.shopToken,
                             templateName: response.config.templateName,
+                            restoreSavedDesign: true,
                             formId: 'product_addtocart_form',
                             addToCartUrl: response.config.addToCartUrl,
                             productId: response.config.productId,
@@ -95,7 +96,7 @@ define([
                             theme: response.config.theme,
                             magicPhotobookTheme: response.config.magicPhotobookTheme,
                             printSettings: response.config.printSettings,
-                            mergeTemplates: response.config.mergeTemplates,
+                            mergeTemplate: response.config.mergeTemplate,
                             shopUserId: response.config.shopUserId || '',
                             productName: response.config.productName || '',
                             productUrl: response.config.productUrl || '',

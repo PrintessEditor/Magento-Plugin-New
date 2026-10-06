@@ -23,23 +23,34 @@ class FormFields extends AbstractBackend
         try {
             if ($this->appState->getAreaCode() === 'adminhtml') {
                 $useDefault = $this->request->getPostValue('use_default');
-                if (is_array($useDefault) && array_key_exists($code, $useDefault)) {
+                if (is_array($useDefault) && !empty($useDefault[$code])) {
                     $object->setData($code, null);
                     return;
                 }
 
                 $postProduct = $this->request->getPostValue('product');
                 if (is_array($postProduct)) {
-                    $value = array_key_exists($code, $postProduct) ? $postProduct[$code] : [];
+                    if (array_key_exists($code, $postProduct)) {
+                        $value = $postProduct[$code];
+                    }
                 }
             }
         } catch (\Exception $e) {
             // area not set (e.g. import/API) — fall through and use getData() value
         }
 
+        if ($value === null) {
+            $object->setData($code, null);
+            return;
+        }
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            $value = is_array($decoded) ? $decoded : [];
+        }
+
         if (is_array($value)) {
-            $rows = array_values(array_filter($value, static function (array $row): bool {
-                return empty($row['delete']) && trim((string)($row['fieldName'] ?? '')) !== '';
+            $rows = array_values(array_filter($value, static function ($row): bool {
+                return is_array($row) && empty($row['delete']) && trim((string)($row['fieldName'] ?? '')) !== '';
             }));
             foreach ($rows as &$row) {
                 $row['fieldName']  = trim((string)$row['fieldName']);
