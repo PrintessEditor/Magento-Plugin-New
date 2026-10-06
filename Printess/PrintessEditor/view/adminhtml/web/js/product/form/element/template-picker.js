@@ -210,8 +210,7 @@ define([
             self.loadingTemplates(true);
             self.templatesError('');
             self.templates([]);
-            var payload = {};
-            if (dirId !== null && dirId !== undefined) { payload.directoryId = dirId; }
+            var payload = {directoryId: (dirId !== null && dirId !== undefined) ? dirId : 0};
 
             proxyPost(self.endpointTemplates, payload).then(function (res) {
                 if (!res.ok || res.error) {

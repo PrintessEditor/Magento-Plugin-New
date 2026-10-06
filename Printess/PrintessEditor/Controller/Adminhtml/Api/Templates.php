@@ -16,7 +16,7 @@ class Templates extends AbstractProxy implements HttpPostActionInterface
 
         $payload = json_encode([
             'templateName' => $data['templateName'] ?? null,
-            'directoryId'  => isset($data['directoryId']) ? (int) $data['directoryId'] : null,
+            'directoryId'  => isset($data['directoryId']) ? (int) $data['directoryId'] : 0,
         ]);
 
         return $this->proxy('/templates/user/load', $payload);
