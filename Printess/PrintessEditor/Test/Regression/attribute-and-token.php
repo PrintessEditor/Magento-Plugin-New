@@ -5,6 +5,7 @@ require dirname(__DIR__, 6) . '/vendor/autoload.php';
 use Printess\PrintessEditor\Model\Product\EditorSettings;
 use Printess\PrintessEditor\Model\PrintessApi;
 use Printess\PrintessEditor\Model\Product\Attribute\Backend\FormFields;
+use Printess\PrintessEditor\Model\Product\Attribute\Backend\PagePricing;
 
 function check($actual, $expected, string $message): void {
     if ($actual !== $expected) {
@@ -23,11 +24,12 @@ $state = new class extends \Magento\Framework\App\State {
     public function __construct() {}
     public function getAreaCode() { return 'adminhtml'; }
 };
-foreach ([FormFields::class => 'printess_form_fields'] as $class => $code) {
+foreach ([FormFields::class => 'printess_form_fields', PagePricing::class => 'printess_page_pricing'] as $class => $code) {
     $backend = new $class($request, $state);
     $attribute = new \Magento\Framework\DataObject(['attribute_code' => $code]);
     $backend->setAttribute($attribute);
-    $stored = $code === 'printess_form_fields' ? '[{"fieldName":"SIZE","fieldValue":"A4"}]' : 'Legacy';
+    $stored = $code === 'printess_form_fields' ? '[{"fieldName":"SIZE","fieldValue":"A4"}]'
+        : '[{"conditions":"DOCUMENT_SIZE=Large","pricePerPage":1.5}]';
     $object = new \Magento\Framework\DataObject([$code => $stored]);
     $request->testPost = ['product' => ['name' => 'Unrelated edit']];
     $backend->beforeSave($object);
@@ -37,7 +39,20 @@ foreach ([FormFields::class => 'printess_form_fields'] as $class => $code) {
     check($object->getData($code), null, 'Use Default clears store override');
     $request->testPost = ['product' => [$code => []], 'use_default' => [$code => 0]];
     $backend->beforeSave($object);
-    check($object->getData($code), $code === 'printess_form_fields' ? '[]' : null, 'Explicit empty value handled');
+    check($object->getData($code), '[]', 'Explicit empty value handled');
+    $object->setData($code, $stored);
+    $request->testPost = ['product' => [$code => $stored], 'use_default' => [$code => 0]];
+    $backend->beforeSave($object);
+    check(json_decode($object->getData($code), true), json_decode($stored, true), 'JSON and unchecked inheritance preserved');
+    $object->setData($code, null);
+    $request->testPost = ['product' => ['name' => 'Unrelated edit']];
+    $backend->beforeSave($object);
+    check($object->getData($code), null, 'Absent store override stays inherited');
+    if ($code === 'printess_page_pricing') {
+        $request->testPost = ['product' => [$code => [['conditions' => '', 'pricePerPage' => 1.5, 'delete' => true]]]];
+        $backend->beforeSave($object);
+        check($object->getData($code), '[]', 'Deleting all dynamic rows clears page pricing');
+    }
 }
 
 $api = new PrintessApi('test');

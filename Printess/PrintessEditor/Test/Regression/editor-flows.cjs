@@ -91,3 +91,58 @@ named.then(name => {
     assert.equal(switches[1][6], 'published');
     console.log('Passed: panel loader fields/callbacks, grouped theme switching, reopen and saved-artwork preservation.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
+
+// Keep the real price calculation and API parsing for the account-page reopen flow.
+(async () => {
+    let integration;
+    const instrumented = source.replace('        promptProjectName: promptProjectName,', `
+        test: {
+            open: openPanelEditor,
+            close: closePanelEditor,
+            setup: function(loader) {
+                _panelLoaderPromise = Promise.resolve(loader);
+                getBasketId = function() { return 'test'; };
+                resolveMinPagesFromApi = async function() { return 0; };
+            }
+        },
+        promptProjectName: promptProjectName,`);
+    vm.runInNewContext(instrumented, {
+        define: (deps, factory) => { integration = factory({}, {}); },
+        window: {addEventListener() {}}, history: {pushState() {}},
+        document: {querySelector() { return null; }},
+        setTimeout: callback => { callback(); }, console
+    });
+    const prices = [], switches = [];
+    let pageCount = 30, loads = 0, hides = 0;
+    const panel = {
+        ui: {
+            show() {}, hide() { hides++; },
+            refreshPriceDisplay(data) { prices.push(data.price); }
+        },
+        api: {
+            getPriceRelevantData() { return {pageCount, priceRelevantFormFields: {}}; },
+            async loadTemplateAndFormFields(...args) { switches.push(args); }
+        }
+    };
+    integration.test.setup({async load() { loads++; return panel; }});
+    const opts = {
+        templateName: 'st:saved', restoreSavedDesign: true,
+        basePrice: 28, pagePricing: [{conditions: '', pricePerPage: 0.30}],
+        currencyCode: 'GBP', locale: 'en-GB'
+    };
+    await integration.test.open(opts);
+    assert.equal(prices.at(-1), '£37.00', 'first open includes page charges');
+    integration.test.close();
+    await integration.test.open(opts);
+    assert.equal(prices.at(-1), '£37.00', 'same-project reopen must retain page charges');
+    assert.equal(loads, 1, 'reopen reuses the loaded editor');
+    assert.equal(hides, 1);
+    assert.equal(switches.length, 0, 'same-project reopen must not reload artwork');
+    pageCount = 40;
+    await integration.test.open({...opts, templateName: 'st:another'});
+    assert.equal(prices.at(-1), '£40.00', 'switching projects reads the new page count');
+    pageCount = 0;
+    await integration.test.open({...opts, templateName: 'st:empty'});
+    assert.equal(prices.at(-1), '£28.00', 'zero-page state must not reuse another project count');
+    console.log('Passed: account project pricing on first open, close/reopen and project switches.');
+})().catch(error => { console.error(error); process.exitCode = 1; });

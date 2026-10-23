@@ -813,6 +813,9 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
                     // Seed initial form fields from the template's current state (same
                     // as the fresh-load path — priceChangeCallback won't fire on show/loadTemplate).
                     var reuseInfo = await getLivePriceInfoFromApi(api);
+                    if (reuseInfo && reuseInfo.pageCount !== null) {
+                        _currentPageCount = reuseInfo.pageCount;
+                    }
                     if (reuseInfo && reuseInfo.formFields && Object.keys(reuseInfo.formFields).length) {
                         // Build field handlers inline (reuse path doesn't have fieldHandlers in scope).
                         var reuseOpts = _activePanelOpts || opts;

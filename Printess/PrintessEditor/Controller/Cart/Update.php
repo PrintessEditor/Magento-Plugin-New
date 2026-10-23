@@ -9,6 +9,7 @@ use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Data\Form\FormKey\Validator;
 use Magento\Framework\Serialize\SerializerInterface;
+use Magento\Framework\Event\ManagerInterface;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Catalog\Api\ProductRepositoryInterface;
@@ -18,6 +19,7 @@ use Magento\Catalog\Model\Product;
 use Printess\PrintessEditor\Helper\Config as PrintessConfig;
 use Printess\PrintessEditor\Model\PrintessApi;
 use Printess\PrintessEditor\Model\ThumbnailUrlValidator;
+use Printess\PrintessEditor\Model\Product\FormFieldValues;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -47,7 +49,8 @@ class Update implements HttpPostActionInterface
         private CartRepositoryInterface $cartRepository,
         private StoreManagerInterface $storeManager,
         private LoggerInterface $logger,
-        private ThumbnailUrlValidator $thumbnailUrlValidator
+        private ThumbnailUrlValidator $thumbnailUrlValidator,
+        private ManagerInterface $eventManager
     ) {
     }
 
@@ -182,7 +185,9 @@ class Update implements HttpPostActionInterface
 
             // Update the Magento custom option selections on the item so the cart
             // display reflects changes made in the builder (e.g. DOCUMENT_SIZE, COVER_TYPE).
+            $previousSku = (string)$item->getSku();
             $this->updateItemCustomOptions($item, $product, $mergedFormFields);
+            $item->setSku($item->getProduct()->getSku());
 
             // Re-apply page pricing using server-authoritative page data.
             $additionalOptions['printess_included_pages'] = [
@@ -192,7 +197,7 @@ class Update implements HttpPostActionInterface
 
             $billablePages = max(0, $pageCount - $minPages);
 
-            $newBasePrice = $this->computeOptionBasePrice($product, $formFields);
+            $newBasePrice = $this->computeOptionBasePrice($product, $mergedFormFields, (float)$item->getQty());
 
             if ($billablePages > 0) {
                 $pagePricingRaw = $product->getData('printess_page_pricing');
@@ -245,6 +250,14 @@ class Update implements HttpPostActionInterface
                 'value'      => $this->serializer->serialize($additionalOptions),
             ]);
 
+            // Allow shop integrations to reapply their pricing after the selections and
+            // page delta have changed, before this request persists and collects totals.
+            $this->eventManager->dispatch('printess_cart_item_update_before_save', [
+                'quote' => $quote,
+                'quote_item' => $item,
+                'previous_sku' => $previousSku,
+            ]);
+            $quote->setTotalsCollectedFlag(false);
             $this->cartRepository->save($quote);
 
             return $result->setData(['success' => true]);
@@ -345,7 +358,9 @@ class Update implements HttpPostActionInterface
                 }
                 $optionTitle = (string)$option->getTitle();
                 // Skip if the pricing token already supplied this key.
-                if (array_key_exists($optionTitle, $formFields)) {
+                $currentValue = FormFieldValues::get($formFields, $optionTitle);
+                if ($currentValue !== null) {
+                    $formFields[$optionTitle] = $currentValue;
                     continue;
                 }
                 $optionId = (string)$option->getOptionId();
@@ -376,7 +391,9 @@ class Update implements HttpPostActionInterface
                     }
                     $attrLabel = (string)$productAttr->getDefaultFrontendLabel();
                     // Don't overwrite keys already provided by the pricing token.
-                    if (array_key_exists($attrLabel, $formFields)) {
+                    $currentValue = FormFieldValues::get($formFields, $attrLabel);
+                    if ($currentValue !== null) {
+                        $formFields[$attrLabel] = $currentValue;
                         continue;
                     }
                     $selectedValueIndex = (string)$superAttributes[$attributeId];
@@ -427,11 +444,11 @@ class Update implements HttpPostActionInterface
                 }
 
                 $optionTitle = (string)$option->getTitle();
-                if (!array_key_exists($optionTitle, $formFields)) {
+                $newValueLabel = FormFieldValues::get($formFields, $optionTitle);
+                if ($newValueLabel === null) {
                     continue;
                 }
 
-                $newValueLabel = (string)$formFields[$optionTitle];
                 if ($newValueLabel === '') {
                     continue;
                 }
@@ -486,19 +503,19 @@ class Update implements HttpPostActionInterface
      * This mirrors the JS "basePrice + computeOptionUpcharge()" pattern and gives
      * the correct base when the user changes size/cover in the builder.
      */
-    private function computeOptionBasePrice(Product $product, array $formFields): float
+    private function computeOptionBasePrice(Product $product, array $formFields, ?float $qty = null): float
     {
-        $base = (float)$product->getFinalPrice();
+        $base = (float)$product->getFinalPrice($qty);
         try {
             foreach (($product->getOptions() ?: []) as $option) {
                 if (!in_array($option->getType(), ['drop_down', 'radio'], true)) {
                     continue;
                 }
                 $optionTitle = (string)$option->getTitle();
-                if (!array_key_exists($optionTitle, $formFields)) {
+                $targetLabel = FormFieldValues::get($formFields, $optionTitle);
+                if ($targetLabel === null) {
                     continue;
                 }
-                $targetLabel = (string)$formFields[$optionTitle];
                 if ($targetLabel === '') {
                     continue;
                 }
@@ -543,7 +560,7 @@ class Update implements HttpPostActionInterface
                 }
                 $key     = trim($kv[0]);
                 $val     = strtolower(trim($kv[1]));
-                $current = strtolower((string)($formFields[$key] ?? ''));
+                $current = strtolower(FormFieldValues::get($formFields, $key) ?? '');
                 if ($current !== $val) {
                     $allMatch = false;
                     break;
