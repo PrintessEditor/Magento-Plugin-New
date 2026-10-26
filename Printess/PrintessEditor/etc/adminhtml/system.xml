@@ -20,6 +20,10 @@
                     <comment>Used server-side to trigger production. Never expose this in the browser.</comment>
                     <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
                 </field>
+                <field id="api_url" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>API URL</label>
+                    <comment>Address of the Printess API. Leave blank for https://api.printess.com; only change this if Printess support asks you to.</comment>
+                </field>
             </group>
             <group id="editor" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Editor Appearance</label>
@@ -34,11 +38,42 @@
                 </field>
             </group>
             <group id="production" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
-                <label>Print Settings</label>
+                <label>Production</label>
                 <field id="print_settings" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Print Settings</label>
                     <source_model>Printess\PrintessEditor\Model\Config\Source\PrintSettings</source_model>
                     <comment>Select the named print settings to use when producing PDFs. Options are loaded from your Printess account.</comment>
+                </field>
+                <field id="hold_until_payment" translate="label comment" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Hold Until Paid</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Wait until the order item is invoiced before sending it to production. Applies to all Printess items, including dropshipped ones.</comment>
+                </field>
+                <field id="approve_before_production" translate="label comment" type="select" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Approve Before Production</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>When enabled, Printess items wait on the order page until an admin approves them. Nothing is produced or shipped before that.</comment>
+                </field>
+                <field id="callback_mode" translate="label comment" type="select" sortOrder="55" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Production Status Updates</label>
+                    <source_model>Printess\PrintessEditor\Model\Config\Source\ProductionCallbackMode</source_model>
+                    <comment>How the shop learns that production finished and that dropship items shipped. Callbacks: Printess calls this store's own URL right away. If that URL is not publicly reachable over https (e.g. a local or test shop), the shop falls back to polling automatically. Polling: the shop checks Printess every few minutes.</comment>
+                </field>
+                <field id="production_callback_url" translate="label comment" type="text" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Callback URL (override, for debugging)</label>
+                    <backend_model>Printess\PrintessEditor\Model\Config\Backend\CallbackUrl</backend_model>
+                    <depends><field id="callback_mode">callbacks</field></depends>
+                    <comment>Leave empty on live shops — Printess then calls this store's own URL. Set it only when Printess can't reach that URL, e.g. a local shop behind an HTTP tunnel. Must be https with a public domain name (no IP addresses or localhost).</comment>
+                </field>
+                <field id="send_shipment_email" translate="label comment" type="select" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Send Shipment Email</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Email the customer the shipment confirmation with tracking information when the dropshipper reports an item as shipped.</comment>
+                </field>
+                <field id="dropship_reproduction_mode" translate="label comment" type="select" sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Reproducing Dropship Orders</label>
+                    <source_model>Printess\PrintessEditor\Model\Config\Source\DropshipReproductionMode</source_model>
+                    <comment>Some dropshippers (e.g. Siteflow) refuse an order number they have received before. By default a reproduction is sent under the order number with a suffix. Alternatively you can be asked each time whether to duplicate the order instead: the copy gets a new order number, is free for the customer (a discount line makes the total 0) and carries a message the customer sees.</comment>
                 </field>
             </group>
             <group id="projects" translate="label" type="text" sortOrder="40"

@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!-- Approve / Restart page of a dropship group (Controller/Adminhtml/Production/Batch). -->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="content">
+            <block class="Printess\PrintessEditor\Block\Adminhtml\Production\Batch"
+                   name="printess.production.batch"
+                   template="Printess_PrintessEditor::production/batch.phtml">
+                <!-- PMD-21: "Ask each time" choice between resend and a copy of the order (Restart page only). -->
+                <block class="Printess\PrintessEditor\Block\Adminhtml\Production\BatchCopy"
+                       name="printess.production.batch.extra"
+                       as="printess.production.batch.extra"
+                       template="Printess_PrintessEditor::production/batch-copy.phtml"/>
+            </block>
+        </referenceContainer>
+    </body>
+</page>

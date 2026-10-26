@@ -1,0 +1,326 @@
+<?php
+/**
+ * Printess Production tab on the admin order view.
+ *
+ * @var \Printess\PrintessEditor\Block\Adminhtml\Order\View\Tab\Production $block
+ * @var \Magento\Framework\Escaper $escaper
+ * @var \Magento\Framework\View\Helper\SecureHtmlRenderer|null $secureRenderer
+ */
+$jobs = $block->getJobViews();
+$formKey = $block->getFormKey();
+?>
+<section class="admin__page-section printess-production">
+    <div class="admin__page-section-title">
+        <span class="title"><?= $escaper->escapeHtml(__('Printess Production')) ?></span>
+    </div>
+    <?php $reproductionOf = $block->getReproductionOf(); ?>
+    <?php $reproductions = $block->getReproductions(); ?>
+    <?php if ($reproductionOf !== null): ?>
+        <div class="message message-notice notice printess-production-reproduction">
+            <div>
+                <?= $escaper->escapeHtml(__('Reproduction of order')) ?>
+                <?php if ($reproductionOf['url'] !== ''): ?>
+                    <a href="<?= $escaper->escapeUrl($reproductionOf['url']) ?>">#<?= $escaper->escapeHtml($reproductionOf['increment_id']) ?></a>
+                <?php else: ?>
+                    #<?= $escaper->escapeHtml($reproductionOf['increment_id']) ?>
+                <?php endif; ?>
+            </div>
+            <div>
+                <?= $escaper->escapeHtml(__('Original order number: %1', $reproductionOf['increment_id'])) ?>
+            </div>
+            <?php if ($reproductionOf['message'] !== ''): ?>
+                <div>
+                    <?= $escaper->escapeHtml(__('Message to the customer:')) ?>
+                    <em><?= $escaper->escapeHtml($reproductionOf['message']) ?></em>
+                </div>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+    <?php if ($reproductions): ?>
+        <div class="admin__page-section-item printess-production-reproductions" style="margin-bottom: 3rem;">
+            <div class="admin__page-section-item-title">
+                <span class="title"><?= $escaper->escapeHtml(__('Reproductions')) ?></span>
+            </div>
+            <?php foreach ($reproductions as $copy): ?>
+                <div style="margin-bottom: 1.5rem;">
+                    <strong>
+                        <?= $escaper->escapeHtml(__('Order')) ?>
+                        <a href="<?= $escaper->escapeUrl($copy['url']) ?>">#<?= $escaper->escapeHtml($copy['increment_id']) ?></a>
+                    </strong>
+                    <?php if ($copy['created_at'] !== ''): ?>
+                        &middot; <?= $escaper->escapeHtml(__('created %1', $copy['created_at'])) ?>
+                    <?php endif; ?>
+                    <?php if (!$copy['items']): ?>
+                        <p><?= $escaper->escapeHtml(__('No Printess production jobs for this copy yet.')) ?></p>
+                    <?php else: ?>
+                        <table class="admin__table-secondary">
+                            <thead>
+                            <tr>
+                                <th><?= $escaper->escapeHtml(__('Item')) ?></th>
+                                <th><?= $escaper->escapeHtml(__('Status')) ?></th>
+                                <th><?= $escaper->escapeHtml(__('Dropship order number')) ?></th>
+                                <th><?= $escaper->escapeHtml(__('Latest tracking')) ?></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($copy['items'] as $item): ?>
+                                <tr>
+                                    <td><?= $escaper->escapeHtml($item['name']) ?></td>
+                                    <td><?= $escaper->escapeHtml($item['status_label']) ?></td>
+                                    <td>
+                                        <?php if ($item['shop_order_id'] !== ''): ?>
+                                            <code><?= $escaper->escapeHtml($item['shop_order_id']) ?></code>
+                                            (<?= $escaper->escapeHtml(__('send %1', $item['send_count'])) ?>)
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if ($item['tracking_url'] !== ''): ?>
+                                            <a href="<?= $escaper->escapeUrl($item['tracking_url']) ?>" target="_blank"
+                                               rel="noopener noreferrer"><?= $escaper->escapeHtml($item['tracking_id'] !== '' ? $item['tracking_id'] : __('Track shipment')) ?></a>
+                                        <?php else: ?>
+                                            <?= $escaper->escapeHtml($item['tracking_id']) ?>
+                                        <?php endif; ?>
+                                        <?php if ($item['shipped_at'] !== ''): ?>
+                                            <br/><?= $escaper->escapeHtml(__('Shipped %1', $item['shipped_at'])) ?>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+    <?php if (!$jobs): ?>
+        <p><?= $escaper->escapeHtml(__('This order has no Printess production jobs.')) ?></p>
+    <?php endif; ?>
+    <?php foreach ($jobs as $job): ?>
+        <div class="admin__page-section-item printess-production-job" style="margin-bottom: 3rem;">
+            <div class="admin__page-section-item-title">
+                <span class="title">
+                    <?= $escaper->escapeHtml($job['item_name']) ?>
+                    <?php if ($job['sku'] !== ''): ?>
+                        (<?= $escaper->escapeHtml($job['sku']) ?>)
+                    <?php endif; ?>
+                </span>
+            </div>
+            <table class="admin__table-secondary">
+                <tbody>
+                <tr>
+                    <th><?= $escaper->escapeHtml(__('Type')) ?></th>
+                    <td><?= $escaper->escapeHtml($job['type_label']) ?></td>
+                </tr>
+                <tr>
+                    <th><?= $escaper->escapeHtml(__('Status')) ?></th>
+                    <td><strong><?= $escaper->escapeHtml($job['status_label']) ?></strong></td>
+                </tr>
+                <?php if ($job['partner_state_label'] !== ''): ?>
+                    <tr>
+                        <th><?= $escaper->escapeHtml(__('Dropshipper state')) ?></th>
+                        <td><?= $escaper->escapeHtml($job['partner_state_label']) ?></td>
+                    </tr>
+                <?php endif; ?>
+                <tr>
+                    <th><?= $escaper->escapeHtml(__('Copies')) ?></th>
+                    <td><?= (int) $job['copies'] ?></td>
+                </tr>
+                <tr>
+                    <th><?= $escaper->escapeHtml(__('Save token')) ?></th>
+                    <td><code><?= $escaper->escapeHtml($job['save_token']) ?></code></td>
+                </tr>
+                <?php if ($job['printess_job_id'] !== ''): ?>
+                    <tr>
+                        <th><?= $escaper->escapeHtml(__('Printess job id')) ?></th>
+                        <td><code><?= $escaper->escapeHtml($job['printess_job_id']) ?></code></td>
+                    </tr>
+                <?php endif; ?>
+                <?php if ($job['printess_order_id'] !== ''): ?>
+                    <tr>
+                        <th><?= $escaper->escapeHtml(__('Printess order id')) ?></th>
+                        <td><code><?= $escaper->escapeHtml($job['printess_order_id']) ?></code></td>
+                    </tr>
+                <?php endif; ?>
+                <?php if ($job['is_dropship']): ?>
+                    <tr>
+                        <th><?= $escaper->escapeHtml(__('Dropship order number')) ?></th>
+                        <td>
+                            <?php if ($job['shop_order_id'] !== ''): ?>
+                                <code><?= $escaper->escapeHtml($job['shop_order_id']) ?></code>
+                                (<?= $escaper->escapeHtml(__('send %1', $job['send_count'])) ?>)
+                            <?php else: ?>
+                                <?= $escaper->escapeHtml(__('Not sent yet')) ?>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endif; ?>
+                <?php if ($job['submitted_at'] !== ''): ?>
+                    <tr>
+                        <th><?= $escaper->escapeHtml(__('Submitted')) ?></th>
+                        <td><?= $escaper->escapeHtml($job['submitted_at']) ?> UTC</td>
+                    </tr>
+                <?php endif; ?>
+                <?php if ($job['tracking_history']): ?>
+                    <tr>
+                        <th><?= $escaper->escapeHtml(__('Tracking')) ?></th>
+                        <td>
+                            <table class="admin__table-secondary printess-production-tracking">
+                                <thead>
+                                <tr>
+                                    <th><?= $escaper->escapeHtml(__('Send')) ?></th>
+                                    <th><?= $escaper->escapeHtml(__('Dropship order number')) ?></th>
+                                    <th><?= $escaper->escapeHtml(__('Tracking id')) ?></th>
+                                    <th><?= $escaper->escapeHtml(__('Shipped')) ?></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ($job['tracking_history'] as $shipment): ?>
+                                    <tr>
+                                        <td><?= $shipment['send'] > 0 ? (int) $shipment['send'] : '&ndash;' ?></td>
+                                        <td>
+                                            <?php if ($shipment['shop_order_id'] !== ''): ?>
+                                                <code><?= $escaper->escapeHtml($shipment['shop_order_id']) ?></code>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php if ($shipment['tracking_url'] !== ''): ?>
+                                                <a href="<?= $escaper->escapeUrl($shipment['tracking_url']) ?>" target="_blank"
+                                                   rel="noopener noreferrer"><?= $escaper->escapeHtml($shipment['tracking_id'] !== '' ? $shipment['tracking_id'] : __('Track shipment')) ?></a>
+                                            <?php else: ?>
+                                                <?= $escaper->escapeHtml($shipment['tracking_id']) ?>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><?= $escaper->escapeHtml($shipment['shipped_at']) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+                <?php elseif ($job['tracking_id'] !== '' || $job['tracking_url'] !== ''): ?>
+                    <tr>
+                        <th><?= $escaper->escapeHtml(__('Tracking')) ?></th>
+                        <td>
+                            <?= $escaper->escapeHtml($job['tracking_id']) ?>
+                            <?php if ($job['tracking_url'] !== ''): ?>
+                                <a href="<?= $escaper->escapeUrl($job['tracking_url']) ?>" target="_blank"
+                                   rel="noopener noreferrer"><?= $escaper->escapeHtml(__('Track shipment')) ?></a>
+                            <?php endif; ?>
+                            <?php if ($job['shipped_at'] !== ''): ?>
+                                <br/><?= $escaper->escapeHtml(__('Shipped %1 UTC', $job['shipped_at'])) ?>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endif; ?>
+                <?php if ($job['files'] || $job['pdf_path'] !== ''): ?>
+                    <tr>
+                        <th><?= $escaper->escapeHtml(__('Result files')) ?></th>
+                        <td>
+                            <?php foreach ($job['files'] as $label => $url): ?>
+                                <a href="<?= $escaper->escapeUrl($url) ?>" target="_blank"
+                                   rel="noopener noreferrer"><?= $escaper->escapeHtml($label) ?></a><br/>
+                            <?php endforeach; ?>
+                            <?php if ($job['pdf_path'] !== ''): ?>
+                                <?= $escaper->escapeHtml(__('Saved on the server: var/%1', $job['pdf_path'])) ?>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endif; ?>
+                <?php if ($job['error_code'] !== '' || $job['error_message'] !== ''): ?>
+                    <tr>
+                        <th><?= $escaper->escapeHtml(__('Error')) ?></th>
+                        <td>
+                            <div class="message message-error error">
+                                <?php if ($job['error_code'] !== ''): ?>
+                                    <code><?= $escaper->escapeHtml($job['error_code']) ?></code>
+                                <?php endif; ?>
+                                <?= $escaper->escapeHtml($job['error_message']) ?>
+                            </div>
+                        </td>
+                    </tr>
+                <?php endif; ?>
+                </tbody>
+            </table>
+
+            <?php if ($job['actions'] || $job['retry_block_reason'] !== null): ?>
+                <div class="printess-production-actions" style="margin: 1rem 0;">
+                    <?php foreach ($job['actions'] as $action): ?>
+                        <?php if ($action['method'] === 'get'): ?>
+                            <a href="<?= $escaper->escapeUrl($action['url']) ?>"
+                               class="action-default scalable"
+                               style="display: inline-block; margin: 0 .5rem .5rem 0;">
+                                <span><?= $escaper->escapeHtml($action['label']) ?></span>
+                            </a>
+                        <?php else: ?>
+                        <form method="post" action="<?= $escaper->escapeUrl($action['url']) ?>"
+                              style="display: inline-block; margin: 0 .5rem .5rem 0;"
+                              <?php if ($action['confirm'] !== null): ?>
+                                  data-printess-confirm="<?= $escaper->escapeHtmlAttr($action['confirm']) ?>"
+                              <?php endif; ?>>
+                            <input type="hidden" name="form_key" value="<?= $escaper->escapeHtmlAttr($formKey) ?>"/>
+                            <?php foreach ($action['params'] as $name => $value): ?>
+                                <input type="hidden" name="<?= $escaper->escapeHtmlAttr($name) ?>"
+                                       value="<?= $escaper->escapeHtmlAttr($value) ?>"/>
+                            <?php endforeach; ?>
+                            <button type="submit" class="action-default scalable">
+                                <span><?= $escaper->escapeHtml($action['label']) ?></span>
+                            </button>
+                        </form>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                    <?php if ($job['retry_block_reason'] !== null): ?>
+                        <div class="message message-notice notice">
+                            <?= $escaper->escapeHtml($job['is_dropship']
+                                ? __('Re-render without dropshipping is not available: %1', $job['retry_block_reason'])
+                                : __('Retry is not available: %1', $job['retry_block_reason'])) ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($job['history']): ?>
+                <details>
+                    <summary><?= $escaper->escapeHtml(__('History (last %1 entries)', count($job['history']))) ?></summary>
+                    <table class="admin__table-secondary">
+                        <tbody>
+                        <?php foreach ($job['history'] as $entry): ?>
+                            <tr>
+                                <th><?= $escaper->escapeHtml($entry['at']) ?></th>
+                                <td><?= $escaper->escapeHtml($entry['text']) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </details>
+            <?php endif; ?>
+        </div>
+    <?php endforeach; ?>
+</section>
+<?php
+// Plain window.confirm() before each action (no modal widget). Bound via a script instead of inline onsubmit
+// attributes so the page also works under a strict admin CSP; the button is disabled after confirming to
+// prevent a double submission (a second /order/retry would create a second Printess order).
+$script = <<<JS
+document.querySelectorAll('.printess-production-actions form').forEach(function (form) {
+    form.addEventListener('submit', function (event) {
+        var message = form.getAttribute('data-printess-confirm');
+        if (message && !window.confirm(message)) {
+            event.preventDefault();
+            return;
+        }
+        if (form.getAttribute('data-printess-submitted')) {
+            event.preventDefault();
+            return;
+        }
+        form.setAttribute('data-printess-submitted', '1');
+        form.querySelectorAll('button').forEach(function (button) { button.disabled = true; });
+    });
+});
+JS;
+?>
+<?php if (isset($secureRenderer)): ?>
+    <?= /* @noEscape */ $secureRenderer->renderTag('script', [], $script, false) ?>
+<?php else: ?>
+    <script><?= /* @noEscape */ $script ?></script>
+<?php endif; ?>

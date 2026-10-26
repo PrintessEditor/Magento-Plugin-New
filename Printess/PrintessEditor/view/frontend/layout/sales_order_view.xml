@@ -13,5 +13,12 @@
         <referenceBlock name="additional.product.info"
                          class="Printess\PrintessEditor\Block\Order\ReorderButton"
                          template="Printess_PrintessEditor::order/item/reorder-button.phtml"/>
+        <!-- PMD-21: "Reproduction of order #…" for order copies, below the order information. -->
+        <referenceContainer name="content">
+            <block class="Printess\PrintessEditor\Block\Order\ReproductionInfo"
+                   name="printess.order.reproduction.info"
+                   template="Printess_PrintessEditor::order/reproduction-info.phtml"
+                   after="sales.order.info"/>
+        </referenceContainer>
     </body>
 </page>

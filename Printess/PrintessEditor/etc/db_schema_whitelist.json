@@ -44,15 +44,55 @@
             "pdf_path": true,
             "fail_count": true,
             "created_at": true,
-            "updated_at": true
+            "updated_at": true,
+            "store_id": true,
+            "production_type": true,
+            "copies": true,
+            "print_settings": true,
+            "callback_mode": true,
+            "nonce": true,
+            "product_definition_id": true,
+            "dropship_data_id": true,
+            "linked_order_id": true,
+            "printess_order_id": true,
+            "submitted_at": true,
+            "dropship_state": true,
+            "tracking_id": true,
+            "tracking_url": true,
+            "tracking_type": true,
+            "shipped_at": true,
+            "magento_shipment_id": true,
+            "result_json": true,
+            "error_code": true,
+            "error_message": true,
+            "history_json": true,
+            "dropship_send_count": true,
+            "dropship_shop_order_id": true,
+            "tracking_json": true,
+            "callback_type": true
         },
         "index": {
             "PRINTESS_PDF_JOBS_STATUS": true,
             "PRINTESS_PDF_JOBS_ORDER_ID": true,
-            "PRINTESS_PDF_JOBS_ORDER_ITEM_ID": true
+            "PRINTESS_PDF_JOBS_ORDER_ITEM_ID": true,
+            "PRINTESS_PDF_JOBS_LINKED_ORDER_ID": true,
+            "PRINTESS_PDF_JOBS_PRINTESS_ORDER_ID": true,
+            "PRINTESS_PDF_JOBS_PRODUCTION_TYPE_STATUS": true
         },
         "constraint": {
-            "PRIMARY": true
+            "PRIMARY": true,
+            "PRINTESS_PDF_JOBS_NONCE": true
+        }
+    },
+    "sales_order": {
+        "column": {
+            "printess_reproduction_of": true,
+            "printess_reproduced_as": true
+        }
+    },
+    "quote": {
+        "column": {
+            "printess_reproduction_of": true
         }
     }
 }

@@ -1031,6 +1031,18 @@ define(['jquery'], function ($) {
         }
     }
 
+    function applyPresetSelections(form, preset) {
+        if (!preset || typeof preset !== 'object') return;
+        ['super_attribute', 'options'].forEach(function (group) {
+            var values = preset[group] || {};
+            Object.keys(values).forEach(function (id) {
+                if (values[id] !== null && values[id] !== '') {
+                    setOrAddHidden(form, group + '[' + id + ']', String(values[id]));
+                }
+            });
+        });
+    }
+
     function ensureMagentoOptionInputs(form, variantOptions, customOptions) {
         (variantOptions || []).forEach(function (attr) {
             var selectedId = null;
@@ -1193,6 +1205,9 @@ define(['jquery'], function ($) {
                         throw new Error('form not found');
                     }
                     showCartLoader('Adding to Cart...');
+                    // Reorder (f22): the old order's option/variant ids go in first; selections the editor
+                    // resolves from its form fields still overwrite them in postFormToCart.
+                    applyPresetSelections(form, cfg.presetSelections);
                     return postFormToCart(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef);
                 }
             };

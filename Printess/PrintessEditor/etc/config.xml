@@ -3,6 +3,13 @@
         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
     <default>
         <printess_designer>
+            <production>
+                <hold_until_payment>0</hold_until_payment>
+                <approve_before_production>0</approve_before_production>
+                <callback_mode>callbacks</callback_mode>
+                <send_shipment_email>1</send_shipment_email>
+                <dropship_reproduction_mode>suffix</dropship_reproduction_mode>
+            </production>
             <projects>
                 <enabled>0</enabled>
                 <retention_days>30</retention_days>
@@ -17,5 +24,17 @@
                 <remove_expired_projects>30 2 * * *</remove_expired_projects>
             </cron>
         </printess_designer>
+        <carriers>
+            <!-- PMD-21: hidden carrier for order copies; rates only while an order copy is being built. -->
+            <printess_reproduction>
+                <active>1</active>
+                <model>Printess\PrintessEditor\Model\Carrier\Reproduction</model>
+                <title>Reproduction (free)</title>
+                <name>Reproduction (free)</name>
+                <sallowspecific>0</sallowspecific>
+                <showmethod>0</showmethod>
+                <sort_order>9999</sort_order>
+            </printess_reproduction>
+        </carriers>
     </default>
 </config>

@@ -21,9 +21,12 @@ class OptionsManager
     public function transferAdditionalOptions($quote, $order): void
     {
         try {
+            // getAllItems(), not getItems(): getItems() is only filled when the quote was loaded through the cart
+            // repository (storefront checkout). Quotes built in code, like the order copy (OrderReproductionService),
+            // leave it null, and the Printess design (save token) would silently not reach the order items.
             $quoteItemsById = [];
-            foreach ($quote->getItems() as $quoteItem) {
-                if (!$quoteItem->getParentItemId()) {
+            foreach ($quote->getAllItems() as $quoteItem) {
+                if (!$quoteItem->getParentItemId() && !$quoteItem->getParentItem() && $quoteItem->getId()) {
                     $quoteItemsById[$quoteItem->getId()] = $quoteItem;
                 }
             }

@@ -1,0 +1,102 @@
+<?php
+/**
+ * Approve / Restart page of a dropship group.
+ *
+ * @var \Printess\PrintessEditor\Block\Adminhtml\Production\Batch $block
+ * @var \Magento\Framework\Escaper $escaper
+ * @var \Magento\Framework\View\Helper\SecureHtmlRenderer|null $secureRenderer
+ */
+$batch = $block->getBatch();
+?>
+<section class="admin__page-section printess-production-batch">
+    <div class="admin__page-section-title">
+        <span class="title"><?= $escaper->escapeHtml($block->getTitleText()) ?></span>
+        <?php if ($batch['order_increment_id'] !== ''): ?>
+            <span>&nbsp;&middot; <?= $escaper->escapeHtml(__('Order #%1', $batch['order_increment_id'])) ?></span>
+        <?php endif; ?>
+    </div>
+
+    <?php if ($batch['dropship']): ?>
+        <p><?= $escaper->escapeHtml($block->getIntroText()) ?></p>
+    <?php endif; ?>
+
+    <table class="admin__table-secondary printess-production-batch-items">
+        <tbody>
+        <?php foreach ($batch['items'] as $item): ?>
+            <tr>
+                <td style="width: 120px;">
+                    <?php if (!empty($item['thumbnail_url'])): ?>
+                        <img src="<?= $escaper->escapeUrl($item['thumbnail_url']) ?>"
+                             alt="<?= $escaper->escapeHtmlAttr($item['name']) ?>"
+                             style="max-width: 100px; max-height: 100px;"/>
+                    <?php endif; ?>
+                </td>
+                <td>
+                    <strong><?= $escaper->escapeHtml($item['name']) ?></strong>
+                    <?php if ($item['sku'] !== ''): ?>
+                        (<?= $escaper->escapeHtml($item['sku']) ?>)
+                    <?php endif; ?>
+                    <br/><?= $escaper->escapeHtml(__('Quantity: %1', (int) $item['qty'])) ?>
+                    <br/><?= $escaper->escapeHtml(__('Status: %1', $block->getStatusLabel((string) $item['status']))) ?>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+
+    <?php if ($batch['next_shop_order_id'] !== null): ?>
+        <p>
+            <?= $escaper->escapeHtml(__('The dropshipper receives the order number %1.', $batch['next_shop_order_id'])) ?>
+        </p>
+    <?php endif; ?>
+
+    <?php if (!$block->isApprove() && $block->hasOutcomeUnknown()): ?>
+        <div class="message message-warning warning">
+            <?= $escaper->escapeHtml(__(
+                'The last submission of at least one of these items could not be confirmed and may have reached '
+                . 'Printess. Check the Printess order list first, otherwise the items may be produced and shipped twice.'
+            )) ?>
+        </div>
+    <?php endif; ?>
+
+    <form method="post" action="<?= $escaper->escapeUrl($block->getSendUrl()) ?>"
+          class="printess-production-batch-form" style="margin-top: 2rem;">
+        <input type="hidden" name="form_key" value="<?= $escaper->escapeHtmlAttr($block->getFormKey()) ?>"/>
+        <input type="hidden" name="job_id" value="<?= (int) $block->getJobId() ?>"/>
+        <input type="hidden" name="batch_action" value="<?= $escaper->escapeHtmlAttr($block->getBatchAction()) ?>"/>
+
+        <?php // PMD-21: copy option ("Ask each time" mode: send again vs. duplicate the order). Rendered only on the
+              // Restart page; the child block reads $block->getReproductionMode() and may add its own inputs. ?>
+        <?php if (!$block->isApprove()): ?>
+            <?= $block->getChildHtml('printess.production.batch.extra') ?>
+        <?php endif; ?>
+
+        <div class="printess-production-batch-actions">
+            <button type="submit" class="action-primary printess-batch-resend-button">
+                <span><?= $escaper->escapeHtml($block->getButtonLabel()) ?></span>
+            </button>
+            <a href="<?= $escaper->escapeUrl($block->getBackUrl()) ?>" class="action-default"
+               style="margin-left: 1rem;"><span><?= $escaper->escapeHtml(__('Cancel')) ?></span></a>
+        </div>
+    </form>
+</section>
+<?php
+// Prevents a double submission (a second click would send the group a second time).
+$script = <<<JS
+document.querySelectorAll('.printess-production-batch-form').forEach(function (form) {
+    form.addEventListener('submit', function (event) {
+        if (form.getAttribute('data-printess-submitted')) {
+            event.preventDefault();
+            return;
+        }
+        form.setAttribute('data-printess-submitted', '1');
+        form.querySelectorAll('button[type="submit"]').forEach(function (button) { button.disabled = true; });
+    });
+});
+JS;
+?>
+<?php if (isset($secureRenderer)): ?>
+    <?= /* @noEscape */ $secureRenderer->renderTag('script', [], $script, false) ?>
+<?php else: ?>
+    <script><?= /* @noEscape */ $script ?></script>
+<?php endif; ?>

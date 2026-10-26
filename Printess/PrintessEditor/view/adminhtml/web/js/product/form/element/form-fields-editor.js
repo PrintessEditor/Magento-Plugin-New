@@ -57,6 +57,8 @@ define([
             this.loadingFields = ko.observable(false);
             this.fieldsLoadComplete = ko.observable(false);
             this.fieldsError = ko.observable('');
+            this.baseTemplate = ko.observable('');
+            this.baseTemplateError = ko.observable('');
             this.hasTemplate = ko.observable(false);
             this.rows = ko.observableArray([]);
             this.availableFieldOptions = ko.computed(function () {
@@ -101,6 +103,8 @@ define([
             this.availableFields([]);
             this.fieldsError('');
             this.fieldsLoadComplete(false);
+            this.baseTemplate('');
+            this.baseTemplateError('');
             if (templateName) {
                 this._loadFormFields(templateName);
             }
@@ -111,6 +115,8 @@ define([
             this.availableFields([]);
             this.fieldsError('');
             this.fieldsLoadComplete(false);
+            this.baseTemplate('');
+            this.baseTemplateError('');
             this._loadFormFields(this._lastLoadedTemplate);
         },
 
@@ -122,6 +128,9 @@ define([
                 self.loadingFields(false);
                 if (res.ok && res.data && Array.isArray(res.data.formFields)) {
                     self.availableFields(res.data.formFields);
+                    // PMD-19: base-template fields are already merged in by the server.
+                    self.baseTemplate(typeof res.data.baseTemplate === 'string' ? res.data.baseTemplate : '');
+                    self.baseTemplateError(typeof res.data.baseTemplateError === 'string' ? res.data.baseTemplateError : '');
                 } else {
                     self.fieldsError(
                         (typeof res.error === 'string' ? res.error : null) || 'Could not load form fields.'
