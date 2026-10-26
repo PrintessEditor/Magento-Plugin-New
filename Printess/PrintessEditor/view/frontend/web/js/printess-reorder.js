@@ -83,6 +83,7 @@ define([
                             shopToken: response.config.shopToken,
                             panelLoaderUrl: response.config.panelLoaderUrl,
                             templateName: response.config.templateName,
+                            restoreSavedDesign: true,
                             formId: 'product_addtocart_form',
                             addToCartUrl: response.config.addToCartUrl,
                             productId: response.config.productId,

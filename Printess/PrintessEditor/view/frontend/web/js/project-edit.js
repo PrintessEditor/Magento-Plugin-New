@@ -8,6 +8,7 @@ define([
             shopToken: config.shopToken,
             panelLoaderUrl: config.panelLoaderUrl,
             templateName: config.templateName,
+            restoreSavedDesign: true,
             formId: 'product_addtocart_form',
             addToCartUrl: config.addToCartUrl || '',
             productId: config.productId || '',

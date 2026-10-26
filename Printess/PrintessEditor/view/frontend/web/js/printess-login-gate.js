@@ -60,6 +60,7 @@ define([
                 panelLoaderUrl: config.panelLoaderUrl,
                 templateName: config.templateName,
                 formId: config.formId,
+                addToCartUrl: config.addToCartUrl || '',
                 variantOptions: config.variantOptions || [],
                 customOptions: config.customOptions || [],
                 pagePricing: config.pagePricing || [],
@@ -70,6 +71,7 @@ define([
                 magicPhotobookTheme: config.magicPhotobookTheme,
                 printSettings: config.printSettings,
                 mergeTemplates: config.mergeTemplates,
+                bypassMagentoPriceBox: config.bypassMagentoPriceBox || false,
                 shopUserId: config.shopUserId || '',
                 productId: config.productId || '',
                 productName: config.productName || '',
@@ -88,6 +90,38 @@ define([
         });
     }
 
+    /**
+     * Apply Printess-specific heading overrides to the authentication popup,
+     * storing the original text so it can be restored when the modal closes.
+     *
+     * @param {Object} loginPopup  { newCustomerHeading, customerLoginHeading }
+     * @returns {Function} restore function — call it to reset headings
+     */
+    function applyLoginPopupHeadings(loginPopup) {
+        var overrides = [
+            { id: 'block-new-customer-heading',  text: loginPopup && loginPopup.newCustomerHeading },
+            { id: 'block-customer-login-heading', text: loginPopup && loginPopup.customerLoginHeading }
+        ];
+        var originals = [];
+
+        overrides.forEach(function (override) {
+            if (!override.text) {
+                return;
+            }
+            var el = document.getElementById(override.id);
+            if (el) {
+                originals.push({ el: el, text: el.textContent });
+                el.textContent = override.text;
+            }
+        });
+
+        return function restoreLoginPopupHeadings() {
+            originals.forEach(function (entry) {
+                entry.el.textContent = entry.text;
+            });
+        };
+    }
+
     function showLoginModal(config) {
         var modalElement;
 
@@ -104,7 +138,10 @@ define([
             return;
         }
 
+        var restoreHeadings = applyLoginPopupHeadings(config.loginPopup);
+
         $(authenticationPopup.modalWindow).one('modalclosed.printessLoginGate', function () {
+            restoreHeadings();
             clearPendingAction(config);
         });
         authenticationPopup.showModal();
@@ -113,6 +150,21 @@ define([
     return function (config, element) {
         var customer = customerData.get('customer'),
             $element = $(element);
+
+        // Invalidate and reload customer data on page load to prevent stale
+        // login state from showing the login modal to an already-logged-in user.
+        // This also handles the post-login redirect case: when the user returns
+        // to this page after logging in, the reload fires customer.subscribe
+        // which then checks isCurrentAction and opens the editor automatically.
+        // The try-catch guards against customerData.invalidate throwing when
+        // the customer section has not yet been written to localStorage
+        // (e.g. first load of a grouped product page).
+        try {
+            customerData.invalidate(['customer']);
+        } catch (e) {
+            // Section not yet in storage — safe to ignore; reload below will populate it.
+        }
+        customerData.reload(['customer'], true);
 
         customer.subscribe(function (customerDataValue) {
             if (!isLoggedIn(function () { return customerDataValue; })) {

@@ -14,7 +14,8 @@ class PrintessVariantSync extends AbstractModifier
     public function __construct(
         private readonly LocatorInterface $locator,
         private readonly ArrayManager $arrayManager
-    ) {}
+    ) {
+    }
 
     public function modifyData(array $data): array
     {
@@ -92,10 +93,11 @@ class PrintessVariantSync extends AbstractModifier
 
     private function buildTablesHtml(array $allOptions): string
     {
+        // phpcs:disable Magento2.Functions.DiscouragedFunction -- Escaper not available in UI modifier context
         $html = '<div id="printess-variant-options-wrapper">';
         foreach ($allOptions as $code => $labels) {
             $rows = implode('', array_map(
-                static fn($l) => '<tr><td style="padding:4px 8px;">' . htmlspecialchars($l) . '</td></tr>',
+                static fn($l) => '<tr><td style="padding:4px 8px;">' . htmlspecialchars((string)$l, ENT_QUOTES, 'UTF-8') . '</td></tr>',
                 $labels
             ));
             $html .= sprintf(
@@ -104,11 +106,12 @@ class PrintessVariantSync extends AbstractModifier
                 . '<thead><tr><th style="padding:4px 8px;">%s</th></tr></thead>'
                 . '<tbody>%s</tbody>'
                 . '</table></div>',
-                htmlspecialchars($code),
+                htmlspecialchars((string)$code, ENT_QUOTES, 'UTF-8'),
                 __('Option Values'),
                 $rows
             );
         }
+        // phpcs:enable
         $html .= '</div>';
         return $html;
     }

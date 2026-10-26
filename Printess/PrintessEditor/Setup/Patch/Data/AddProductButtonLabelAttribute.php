@@ -15,7 +15,8 @@ class AddProductButtonLabelAttribute implements DataPatchInterface
 
     public function __construct(
         private EavSetupFactory $eavSetupFactory
-    ) {}
+    ) {
+    }
 
     public function apply(): void
     {

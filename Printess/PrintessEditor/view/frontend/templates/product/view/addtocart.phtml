@@ -39,20 +39,25 @@ $_printSettings        = $_productPrintSettings !== '' ? $_productPrintSettings 
 // Magic Photobook theme (product-level only)
 $_magicPhotobookTheme = (string)($_product->getData('printess_magic_photobook_theme') ?? '');
 
-// Per-page pricing
-$_pagePricing = json_encode($_product->getData('printess_page_pricing') ?: []);
+// Per-page pricing (attribute may come back as an array or a JSON string)
+$_pagePricingRaw = $_product->getData('printess_page_pricing');
+$_pagePricing = json_encode(
+    is_array($_pagePricingRaw)
+        ? $_pagePricingRaw
+        : (json_decode((string)$_pagePricingRaw, true) ?: [])
+);
 $_basePrice   = (float)$_product->getFinalPrice();
 
-// Predefined form fields: convert {fieldName, fieldValue} storage format to {name, value} for JS
-$_predefinedFormFields = json_encode(array_values(array_map(
-    static function (array $row): array {
-        return ['name' => (string)($row['fieldName'] ?? ''), 'value' => (string)($row['fieldValue'] ?? '')];
-    },
-    array_filter(
-        (array)($_product->getData('printess_form_fields') ?: []),
-        static function (array $row): bool { return trim((string)($row['fieldName'] ?? '')) !== ''; }
-    )
-)));
+// Predefined form fields: {fieldName, fieldValue} rows (array or JSON string) -> {name, value} for JS
+$_predefinedFormFields = json_encode(\Printess\PrintessEditor\Model\Product\EditorSettings::formFields(
+    $_product->getData('printess_form_fields')
+));
+
+// Login popup heading overrides (blank = theme default)
+$_loginPopup = [
+    'newCustomerHeading'   => $_config->getLoginNewCustomerHeading(),
+    'customerLoginHeading' => $_config->getLoginCustomerLoginHeading(),
+];
 
 // Auto variant sync: all configurable attributes, matched by label in JS
 $_variantOptions = [];
@@ -248,7 +253,8 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
             "magicPhotobookTheme": <?= /* @noEscape */ json_encode($_magicPhotobookTheme) ?>,
             "printSettings": <?= /* @noEscape */ json_encode($_printSettings) ?>,
             "mergeTemplates": <?= /* @noEscape */ $_mergeTemplates ?>,
-            "predefinedFormFields": <?= /* @noEscape */ $_predefinedFormFields ?>
+            "predefinedFormFields": <?= /* @noEscape */ $_predefinedFormFields ?>,
+            "loginPopup": <?= /* @noEscape */ json_encode($_loginPopup) ?>
         }
     }
 }

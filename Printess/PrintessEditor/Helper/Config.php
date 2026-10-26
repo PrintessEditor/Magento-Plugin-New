@@ -19,6 +19,9 @@ class Config extends AbstractHelper
 
     private const EDITOR_HOST = 'https://editor.printess.com/';
 
+    public const XML_PATH_LOGIN_NEW_CUSTOMER_HEADING  = 'printess_designer/login_popup/new_customer_heading';
+    public const XML_PATH_LOGIN_CUSTOMER_LOGIN_HEADING = 'printess_designer/login_popup/customer_login_heading';
+
     private EncryptorInterface $encryptor;
 
     public function __construct(Context $context, EncryptorInterface $encryptor)
@@ -98,5 +101,15 @@ class Config extends AbstractHelper
     public function getSlimLoaderUrl(): string
     {
         return self::EDITOR_HOST . $this->getEditorVersionPath() . 'slim-ui.js';
+    }
+
+    public function getLoginNewCustomerHeading(): string
+    {
+        return (string)$this->scopeConfig->getValue(self::XML_PATH_LOGIN_NEW_CUSTOMER_HEADING, ScopeInterface::SCOPE_STORE);
+    }
+
+    public function getLoginCustomerLoginHeading(): string
+    {
+        return (string)$this->scopeConfig->getValue(self::XML_PATH_LOGIN_CUSTOMER_LOGIN_HEADING, ScopeInterface::SCOPE_STORE);
     }
 }

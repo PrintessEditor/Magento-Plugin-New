@@ -38,7 +38,7 @@ use Magento\Wishlist\Helper\Data;
                 <ol class="product-items <?= /* @noEscape */ $type ?>">
                     <?php $iterator = 1; ?>
                     <?php foreach ($items as $_item): ?>
-                    <?php $_printessTemplate = (string)($_item->getData('printess_template') ?? ''); ?>
+                        <?php $_printessTemplate = (string)($_item->getData('printess_template') ?? ''); ?>
                         <?= /* @noEscape */ ($iterator++ == 1) ? '<li class="product-item">' : '</li><li class="product-item">' ?>
                         <div class="product-item-info">
                             <a href="<?= $escaper->escapeUrl($block->getProductUrl($_item)) ?>" class="product-item-photo">

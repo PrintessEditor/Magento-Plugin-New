@@ -2,7 +2,7 @@
  * Printess Editor integration for Magento.
  * Supports both Panel UI (fullscreen) and Slim UI (inline).
  */
-define(['jquery'], function ($) {
+define(['jquery', 'mage/url'], function ($, mageUrl) {
     'use strict';
 
     var DEFAULT_PANEL_LOADER_URL = 'https://editor.printess.com/printess-editor/loader.js';
@@ -24,6 +24,7 @@ define(['jquery'], function ($) {
     var _selectedOptionPrices = {};  // optionId -> price of currently selected value (used when no Magento price box)
     var _activePanelOpts = null;     // mutable ref to the current panel config — callbacks read from this so re-opening a different project works correctly
     var _panelLoadedTemplate = '';   // save token currently loaded in the persistent editor instance
+    var _panelLoadedPhotobookTheme = ''; // product default used for the current editor load
 
     var _cartLoaderOverlay = null;
 
@@ -145,6 +146,7 @@ define(['jquery'], function ($) {
         } catch (e) { }
         _panelEditorRef = null;
         _panelLoadedTemplate = '';
+        _panelLoadedPhotobookTheme = '';
     }
 
     // Intercept the browser back button while the panel editor is open.
@@ -428,6 +430,17 @@ define(['jquery'], function ($) {
         return Object.keys(map).map(function (k) { return { name: k, value: map[k] }; });
     }
 
+    // Printess selects photobook layouts through this hidden form field, not a
+    // magicPhotobookTheme loader parameter. Preserve an explicitly supplied value
+    // (for example, the customer's theme restored from a saved cart item).
+    function withPhotobookTheme(formFields, theme) {
+        var fields = (formFields || []).slice();
+        if (theme && !fields.some(function (ff) { return ff.name === 'PHOTOBOOK_THEME'; })) {
+            fields.push({ name: 'PHOTOBOOK_THEME', value: theme });
+        }
+        return fields;
+    }
+
     function findMatchingVariantAttr(variantOptions, fieldName, fieldLabel) {
         var nameLower = (fieldName || '').toLowerCase();
         var labelLower = (fieldLabel || '').toLowerCase();
@@ -442,7 +455,23 @@ define(['jquery'], function ($) {
 
     function getPanelLoader(url) {
         if (!_panelLoaderPromise) {
-            _panelLoaderPromise = import(url || DEFAULT_PANEL_LOADER_URL);
+            // The Printess SDK bundles Preact which uses an anonymous define() call.
+            // RequireJS intercepts this and throws "Mismatched anonymous define" when
+            // the SDK is loaded via native import(). Temporarily detach RequireJS's
+            // global define so the SDK loads cleanly, then restore it afterwards.
+            var savedDefine = window.define;
+            window.define = undefined;
+            _panelLoaderPromise = import(url || DEFAULT_PANEL_LOADER_URL).then(
+                function (mod) {
+                    window.define = savedDefine;
+                    return mod;
+                },
+                function (err) {
+                    window.define = savedDefine;
+                    _panelLoaderPromise = null;
+                    return Promise.reject(err);
+                }
+            );
         }
         return _panelLoaderPromise;
     }
@@ -681,37 +710,52 @@ define(['jquery'], function ($) {
         }, 0);
     }
 
-    // Read the current Magento final price from the product page price box.
-    // Magento's price-box widget updates data-price-amount synchronously when a
-    // custom option or configurable attribute change event fires.
+    // Read the Magento product page price box.
+    // On the product page (.product-info-main present) we read the live price-box
+    // widget so that synchronous Magento custom-option price recalculations are
+    // picked up immediately when setCustomOptionInMagento fires a 'change' event.
+    // On the cart / account page (.product-info-main absent) we skip the DOM read
+    // entirely to avoid picking up stale cart-row [data-role="priceBox"] elements,
+    // and fall straight through to fallback + computeOptionUpcharge().
     function readMagentoFinalPrice(fallback) {
-        var box = document.querySelector('.product-info-main [data-role="priceBox"], [data-role="priceBox"]');
-        if (box && window.jQuery) {
-            var $box = window.jQuery(box);
-            try {
-                var widget = $box.data('magePriceBox') || $box.data('mage-priceBox');
-                var display = widget && widget.cache && widget.cache.displayPrices && widget.cache.displayPrices.finalPrice;
-                if (display) {
-                    var finalAmount = parseFloat(typeof display.final !== 'undefined' ? display.final : display.amount);
-                    if (!isNaN(finalAmount) && finalAmount > 0) return finalAmount;
-                }
-                if ($box.priceBox && $box.priceBox('option') && $box.priceBox('option').prices) {
-                    var optPrices = $box.priceBox('option').prices;
-                    if (optPrices.finalPrice && typeof optPrices.finalPrice.amount !== 'undefined') {
-                        var optAmount = parseFloat(optPrices.finalPrice.amount);
-                        if (!isNaN(optAmount) && optAmount > 0) return optAmount;
+        var onProductPage = !!document.querySelector('.product-info-main');
+        // When the editor is opened for a grouped-product child, the standard
+        // Magento price box belongs to the *parent* grouped product and never
+        // reflects child custom-option changes.  Skip the DOM read and rely on
+        // fallback + computeOptionUpcharge() instead.
+        var bypassDom = _activePanelOpts && _activePanelOpts.bypassMagentoPriceBox;
+        if (onProductPage && !bypassDom) {
+            // Prefer the scoped selector; fall back to any price box on the page.
+            var box = document.querySelector('.product-info-main [data-role="priceBox"]')
+                   || document.querySelector('[data-role="priceBox"]');
+            if (box && window.jQuery) {
+                var $box = window.jQuery(box);
+                try {
+                    var widget = $box.data('magePriceBox') || $box.data('mage-priceBox');
+                    var display = widget && widget.cache && widget.cache.displayPrices && widget.cache.displayPrices.finalPrice;
+                    if (display) {
+                        var finalAmount = parseFloat(typeof display.final !== 'undefined' ? display.final : display.amount);
+                        if (!isNaN(finalAmount) && finalAmount > 0) return finalAmount;
                     }
-                }
-            } catch (e) { }
+                    if ($box.priceBox && $box.priceBox('option') && $box.priceBox('option').prices) {
+                        var optPrices = $box.priceBox('option').prices;
+                        if (optPrices.finalPrice && typeof optPrices.finalPrice.amount !== 'undefined') {
+                            var optAmount = parseFloat(optPrices.finalPrice.amount);
+                            if (!isNaN(optAmount) && optAmount > 0) return optAmount;
+                        }
+                    }
+                } catch (e) { }
+            }
+            var el = document.querySelector('.product-info-main [data-price-type="finalPrice"]')
+                  || document.querySelector('[data-price-type="finalPrice"]');
+            if (el) {
+                var attrAmount = parseFloat(el.getAttribute('data-price-amount'));
+                if (!isNaN(attrAmount) && attrAmount > 0) return attrAmount;
+                var textAmount = parseFloat(String(el.textContent || '').replace(/[^0-9.,-]/g, '').replace(',', '.'));
+                if (!isNaN(textAmount) && textAmount > 0) return textAmount;
+            }
         }
-
-        var el = document.querySelector('.product-info-main [data-price-type="finalPrice"], [data-role="priceBox"] [data-price-type="finalPrice"]');
-        if (el) {
-            var attrAmount = parseFloat(el.getAttribute('data-price-amount'));
-            if (!isNaN(attrAmount) && attrAmount > 0) return attrAmount;
-            var textAmount = parseFloat(String(el.textContent || '').replace(/[^0-9.,-]/g, '').replace(',', '.'));
-            if (!isNaN(textAmount) && textAmount > 0) return textAmount;
-        }
+        // Not on product page, or price-box read failed: use option upcharge fallback.
         return fallback + computeOptionUpcharge();
     }
 
@@ -726,10 +770,10 @@ define(['jquery'], function ($) {
                 0
             );
             _currentPageCount = pageCount;
-            if (!_minPagesResolved && pageCount > 0) {
-                _minPages = pageCount;
-                _minPagesResolved = true;
-            }
+            // Do NOT set _minPages here. _minPages is authoritative only from
+            // resolveMinPagesFromApi (template API) or opts.minPages (cart-edit stored value).
+            // Setting _minPages=pageCount on first fire would make billablePages=0
+            // and freeze the displayed price at the catalog base.
 
             if (data && typeof data === 'object' && data.priceRelevantFormFields) {
                 Object.keys(data.priceRelevantFormFields).forEach(function (k) {
@@ -758,7 +802,15 @@ define(['jquery'], function ($) {
         };
     }
 
+    // Merge templates are only attached for fresh template loads. A saved design
+    // (save token) already contains the merged content.
+    function getMergeTemplates(opts) {
+        return !opts.restoreSavedDesign && opts.mergeTemplates && opts.mergeTemplates.length ? opts.mergeTemplates : [];
+    }
+
     async function openPanelEditor(opts) {
+        var formFields = opts.restoreSavedDesign ? (opts.formFields || []) :
+            withPhotobookTheme(opts.formFields, opts.magicPhotobookTheme);
         _currentTemplateName = opts.templateName || '';
         _currentShopToken = opts.shopToken || '';
         _activePanelOpts = opts; // always update so callbacks dispatch to the current project
@@ -782,8 +834,21 @@ define(['jquery'], function ($) {
 
                     ui.show();
 
-                    if (opts.templateName && opts.templateName !== _panelLoadedTemplate) {
-                        if (api && typeof api.loadTemplate === 'function') {
+                    if (opts.templateName && (opts.templateName !== _panelLoadedTemplate ||
+                        (opts.magicPhotobookTheme || '') !== _panelLoadedPhotobookTheme)) {
+                        if (api && typeof api.loadTemplateAndFormFields === 'function') {
+                            await api.loadTemplateAndFormFields(
+                                opts.templateName, getMergeTemplates(opts), formFields,
+                                null, null, false, 'published'
+                            );
+                            _panelLoadedTemplate = opts.templateName;
+                            _panelLoadedPhotobookTheme = opts.magicPhotobookTheme || '';
+                        } else if (opts.magicPhotobookTheme || _panelLoadedPhotobookTheme ||
+                            getMergeTemplates(opts).length) {
+                            // Older API: fall through to a fresh loader call so the
+                            // selected theme / merge templates are still applied.
+                            throw new Error('Printess: template switch requires a fresh editor load');
+                        } else if (api && typeof api.loadTemplate === 'function') {
                             await api.loadTemplate(opts.templateName);
                             _panelLoadedTemplate = opts.templateName;
                         }
@@ -792,6 +857,9 @@ define(['jquery'], function ($) {
                     // Seed initial form fields from the template's current state (same
                     // as the fresh-load path — priceChangeCallback won't fire on show/loadTemplate).
                     var reuseInfo = await getLivePriceInfoFromApi(api);
+                    if (reuseInfo && reuseInfo.pageCount !== null) {
+                        _currentPageCount = reuseInfo.pageCount;
+                    }
                     if (reuseInfo && reuseInfo.formFields && Object.keys(reuseInfo.formFields).length) {
                         // Build field handlers inline (reuse path doesn't have fieldHandlers in scope).
                         var reuseOpts = _activePanelOpts || opts;
@@ -809,6 +877,19 @@ define(['jquery'], function ($) {
                                 trackOptionPrice(opt, selectedId);
                             }
                         });
+                    }
+
+                    // Seed _minPages before refreshEditorPrice: prefer explicitly-passed value
+                    // (cart-edit flow), otherwise resolve from the Printess template API.
+                    if (opts.minPages !== null && opts.minPages !== undefined && opts.minPages >= 0) {
+                        _minPages = opts.minPages;
+                        _minPagesResolved = true;
+                    } else if (opts.templateName && opts.shopToken) {
+                        var reuseMinPages = await resolveMinPagesFromApi(api, opts.templateName, opts.shopToken);
+                        if (reuseMinPages > 0) {
+                            _minPages = reuseMinPages;
+                            _minPagesResolved = true;
+                        }
                     }
 
                     refreshEditorPrice(_panelEditorRef, opts.basePrice || 0, opts.pagePricing || [], opts.currencyCode, opts.locale);
@@ -830,10 +911,18 @@ define(['jquery'], function ($) {
         _minPages = 0;
         _minPagesResolved = false;
 
+        // If the caller explicitly provides the known included-page count (e.g. from
+        // additional_options stored at add-to-cart time), seed _minPages immediately
+        // so the initial price display is correct without waiting for the Printess API.
+        if (opts.minPages !== null && opts.minPages !== undefined && opts.minPages >= 0) {
+            _minPages = opts.minPages;
+            _minPagesResolved = true;
+        }
+
         // Seed form fields from the initial values passed to Printess so the first
         // priceChangeCallback fires with the correct field state.
-        if (opts.formFields) {
-            opts.formFields.forEach(function (ff) {
+        if (formFields.length) {
+            formFields.forEach(function (ff) {
                 _currentFormFields[ff.name] = ff.value;
             });
         }
@@ -858,8 +947,8 @@ define(['jquery'], function ($) {
                 return activeOpts.onAddToBasket(saveToken, thumbnailUrl, panelRef && panelRef.api ? panelRef.api : null);
             }
         };
-        if (opts.formFields && opts.formFields.length) {
-            loadCfg.formFields = opts.formFields;
+        if (formFields.length) {
+            loadCfg.formFields = formFields;
         }
 
         var variantOptions = opts.variantOptions || [];
@@ -891,13 +980,8 @@ define(['jquery'], function ($) {
         };
 
         if (opts.theme) loadCfg.theme = opts.theme;
-        if (opts.magicPhotobookTheme) {
-            var themeField = {name: 'PHOTOBOOK_THEME', value: opts.magicPhotobookTheme};
-            loadCfg.formFields = (loadCfg.formFields || []).concat([themeField]);
-            _currentFormFields['PHOTOBOOK_THEME'] = opts.magicPhotobookTheme;
-        }
         if (opts.printSettings) loadCfg.printSettings = opts.printSettings;
-        if (opts.mergeTemplates && opts.mergeTemplates.length) loadCfg.attach = { mergeTemplates: opts.mergeTemplates };
+        if (getMergeTemplates(opts).length) loadCfg.attach = { mergeTemplates: getMergeTemplates(opts) };
         // Printess native save/load callbacks
         loadCfg.isShopUserLoggedInCallback = function () {
             var activeOpts = _activePanelOpts || opts;
@@ -982,6 +1066,7 @@ define(['jquery'], function ($) {
         panelRef = await loaderModule.load(loadCfg);
         _panelEditorRef = panelRef;
         _panelLoadedTemplate = opts.templateName || '';
+        _panelLoadedPhotobookTheme = opts.magicPhotobookTheme || '';
         var resolvedMinPages = await resolveMinPagesFromApi(
             panelRef && panelRef.api ? panelRef.api : panelRef,
             opts.templateName,
@@ -1009,7 +1094,7 @@ define(['jquery'], function ($) {
                 fieldHandlers.forEach(function (h) { h(name, value, null, name); });
             });
         }
-        if (liveInfo && liveInfo.pageCount !== null && !_minPagesResolved) {
+        if (liveInfo && liveInfo.pageCount !== null && liveInfo.pageCount > 0) {
             _currentPageCount = liveInfo.pageCount;
         }
 
@@ -1099,37 +1184,12 @@ define(['jquery'], function ($) {
         return form;
     }
 
+    // Page count, included pages and form fields are no longer posted from the
+    // browser: SaveTokenToCart reads them server-side from Printess /book/info.
     async function postFormToCart(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef) {
-        var live = await getLivePriceInfoFromApi(apiRef);
-        var effectivePageCount = _currentPageCount || 0;
-        var effectiveFormFields = _currentFormFields || {};
-
-        if (live) {
-            if (live.pageCount !== null && !isNaN(live.pageCount) && live.pageCount > 0) {
-                effectivePageCount = live.pageCount;
-                _currentPageCount = live.pageCount;
-            }
-            if (live.formFields && typeof live.formFields === 'object') {
-                effectiveFormFields = live.formFields;
-                _currentFormFields = live.formFields;
-            }
-        }
-
-        var effectiveIncludedPages = (_minPages || 0);
-        var liveIncludedPages = await resolveMinPagesFromApi(apiRef, _currentTemplateName, _currentShopToken);
-        if (typeof liveIncludedPages === 'number') {
-            effectiveIncludedPages = liveIncludedPages;
-            _minPages = liveIncludedPages;
-            _minPagesResolved = true;
-        }
-
         ensureMagentoOptionInputs(form, variantOptions, customOptions);
         setOrAddHidden(form, 'saveToken', saveToken || '');
         setOrAddHidden(form, 'thumbnailUrl', thumbnailUrl || '');
-
-        setOrAddHidden(form, 'printessPageCount', String(effectivePageCount));
-        setOrAddHidden(form, 'printessIncludedPages', String(effectiveIncludedPages));
-        setOrAddHidden(form, 'printessFormFields', JSON.stringify(effectiveFormFields));
 
         var formData = new FormData(form);
 
@@ -1139,7 +1199,7 @@ define(['jquery'], function ($) {
             credentials: 'same-origin',
             redirect: 'follow'
         }).then(function () {
-            window.location.href = '/checkout/cart/';
+            window.location.href = mageUrl.build('checkout/cart/');
         }).catch(function (err) {
             console.error('Printess: add-to-cart failed', err);
             form.submit();
@@ -1163,6 +1223,7 @@ define(['jquery'], function ($) {
                 shopToken: cfg.shopToken,
                 panelLoaderUrl: cfg.panelLoaderUrl,
                 templateName: cfg.templateName,
+                restoreSavedDesign: cfg.restoreSavedDesign || false,
                 formFields: mergePredefinedFormFields(cfg.predefinedFormFields, buildAutoFormFields(variantOptions, customOptions)),
                 variantOptions: variantOptions,
                 customOptions: customOptions,
@@ -1174,6 +1235,7 @@ define(['jquery'], function ($) {
                 currencyCode: cfg.currencyCode,
                 locale: cfg.locale,
                 basePrice: cfg.basePrice,
+                bypassMagentoPriceBox: cfg.bypassMagentoPriceBox || false,
                 shopUserId: cfg.shopUserId || '',
                 productId: cfg.productId || '',
                 productDisplayName: cfg.productName || '',
@@ -1191,6 +1253,11 @@ define(['jquery'], function ($) {
                     if (!form) {
                         console.error('Printess: add-to-cart form not found');
                         throw new Error('form not found');
+                    }
+                    // Lets SaveTokenToCart update the existing "My Projects" entry
+                    // (set when a project was opened or restored via native load).
+                    if (panelCfg.projectId) {
+                        setOrAddHidden(form, 'printessProjectId', String(panelCfg.projectId));
                     }
                     showCartLoader('Adding to Cart...');
                     return postFormToCart(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef);
@@ -1237,7 +1304,7 @@ define(['jquery'], function ($) {
 
                 if (cfg.theme) slimCfg.theme = cfg.theme;
                 if (cfg.magicPhotobookTheme) {
-                    slimCfg.formFields = (slimCfg.formFields || []).concat([{name: 'PHOTOBOOK_THEME', value: cfg.magicPhotobookTheme}]);
+                    slimCfg.formFields = withPhotobookTheme(slimCfg.formFields, cfg.magicPhotobookTheme);
                 }
                 if (cfg.printSettings) slimCfg.printSettings = cfg.printSettings;
                 if (cfg.mergeTemplates && cfg.mergeTemplates.length) slimCfg.attach = { mergeTemplates: cfg.mergeTemplates };
@@ -1374,6 +1441,7 @@ define(['jquery'], function ($) {
                     shopToken: cfg.shopToken || _currentShopToken,
                     panelLoaderUrl: cfg.panelLoaderUrl,
                     templateName: data.saveToken,
+                    restoreSavedDesign: true,
                     variantOptions: variantOptions,
                     customOptions: customOptions,
                     theme: cfg.theme,
@@ -1412,30 +1480,62 @@ define(['jquery'], function ($) {
          */
         openFromCart: function (cfg) {
             openPanelEditor({
-                shopToken: cfg.shopToken,
-                panelLoaderUrl: cfg.panelLoaderUrl,
-                templateName: cfg.saveToken,
-                onAddToBasket: function (newSaveToken, newThumbnailUrl) {
+                shopToken:           cfg.shopToken,
+                panelLoaderUrl:      cfg.panelLoaderUrl,
+                templateName:        cfg.saveToken,
+                restoreSavedDesign:  true,
+                basePrice:           cfg.basePrice || 0,
+                customOptions:       cfg.customOptions || [],
+                formFields:          cfg.formFields || [],
+                pagePricing:         cfg.pagePricing || [],
+                currencyCode:        cfg.currencyCode,
+                locale:              cfg.locale,
+                minPages:            (typeof cfg.minPages === 'number' && cfg.minPages >= 0) ? cfg.minPages : null,
+                theme:               cfg.theme,
+                magicPhotobookTheme: cfg.magicPhotobookTheme,
+                printSettings:       cfg.printSettings,
+                productId:           cfg.productId || '',
+                projectId:           cfg.projectId || null,
+                onAddToBasket: async function (newSaveToken, newThumbnailUrl) {
+                    showCartLoader('Updating your project…');
+
+                    // Keep the customer's "My Projects" entry in sync with the cart item's
+                    // latest save token (no-op for guests: the save endpoint returns 401).
+                    if (cfg.saveUrl && cfg.productId) {
+                        var syncData = {
+                            save_token:    newSaveToken,
+                            product_id:    cfg.productId,
+                            thumbnail_url: newThumbnailUrl || '',
+                            form_key:      cfg.formKey
+                        };
+                        if (cfg.projectId) { syncData.project_id = cfg.projectId; }
+                        $.ajax({ url: cfg.saveUrl, method: 'POST', data: syncData });
+                    }
+
                     return new Promise(function (resolve, reject) {
                         $.ajax({
                             url: cfg.updateUrl,
                             method: 'POST',
                             data: {
-                                itemId: cfg.itemId,
-                                saveToken: newSaveToken,
+                                itemId:       cfg.itemId,
+                                saveToken:    newSaveToken,
                                 thumbnailUrl: newThumbnailUrl || '',
-                                form_key: cfg.formKey
+                                // Live editor form field values, used as a fallback when /book/info fails (e.g. Calendars).
+                                formFields:   JSON.stringify(_currentFormFields || {}),
+                                form_key:     cfg.formKey
                             },
                             success: function (response) {
                                 if (response && response.success) {
                                     resolve();
                                     window.location.reload();
                                 } else {
+                                    hideCartLoader();
                                     reject(new Error('update failed'));
                                     alert('Could not update your customisation. Please try again.');
                                 }
                             },
                             error: function () {
+                                hideCartLoader();
                                 reject(new Error('network error'));
                                 alert('Could not update your customisation. Please try again.');
                             }
