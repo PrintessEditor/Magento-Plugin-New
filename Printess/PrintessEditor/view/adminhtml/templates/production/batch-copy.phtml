@@ -1,0 +1,141 @@
+<?php
+/**
+ * PMD-21: "Ask each time" choice on the Restart page (child `printess.production.batch.extra`, rendered inside the
+ * page's form). Resend keeps the page's own button (printess/production/sendbatch); the copy button posts the same
+ * form to printess/production/reproduce via formaction.
+ *
+ * @var \Printess\PrintessEditor\Block\Adminhtml\Production\BatchCopy $block
+ * @var \Magento\Framework\Escaper $escaper
+ * @var \Magento\Framework\View\Helper\SecureHtmlRenderer|null $secureRenderer
+ */
+$items = $block->getItems();
+?>
+<fieldset class="admin__fieldset printess-batch-choice" style="margin: 2rem 0;">
+    <div class="admin__field admin__field-option">
+        <input type="radio" class="admin__control-radio" name="reproduction_choice" id="printess-batch-choice-resend"
+               value="<?= $escaper->escapeHtmlAttr($block->getChoiceResend()) ?>" checked="checked"/>
+        <label class="admin__field-label" for="printess-batch-choice-resend">
+            <?= $escaper->escapeHtml($block->getResendLabel()) ?>
+        </label>
+    </div>
+    <div class="admin__field admin__field-option">
+        <input type="radio" class="admin__control-radio" name="reproduction_choice" id="printess-batch-choice-copy"
+               value="<?= $escaper->escapeHtmlAttr($block->getChoiceCopy()) ?>"/>
+        <label class="admin__field-label" for="printess-batch-choice-copy">
+            <?= $escaper->escapeHtml(__('Duplicate the order and dropship the copy (new order number)')) ?>
+        </label>
+    </div>
+
+    <div class="printess-batch-copy-fields" style="margin: 1rem 0 0 2.5rem;">
+        <p><?= $escaper->escapeHtml(__(
+            'The copy gets a new order number and contains the selected items with their prices. A discount line '
+            . 'makes it free for the customer, who sees the copy in their account together with your message. The '
+            . 'copy\'s items go to production right away.'
+        )) ?></p>
+
+        <div class="admin__field">
+            <span class="admin__field-label"><strong><?= $escaper->escapeHtml(__('Items for the copy')) ?></strong></span>
+            <div class="admin__field-control">
+                <?php foreach ($items as $item): ?>
+                    <?php $inputId = 'printess-copy-item-' . (int) $item['order_item_id']; ?>
+                    <div class="admin__field admin__field-option">
+                        <input type="checkbox" class="admin__control-checkbox" name="copy_items[]"
+                               id="<?= $escaper->escapeHtmlAttr($inputId) ?>"
+                               value="<?= (int) $item['order_item_id'] ?>"
+                               <?= $item['selected'] ? 'checked="checked"' : '' ?>/>
+                        <label class="admin__field-label" for="<?= $escaper->escapeHtmlAttr($inputId) ?>">
+                            <?= $escaper->escapeHtml($item['name']) ?>
+                            <?php if ($item['sku'] !== ''): ?>
+                                (<?= $escaper->escapeHtml($item['sku']) ?>)
+                            <?php endif; ?>
+                            &middot; <?= $escaper->escapeHtml(__('Quantity: %1', (int) $item['qty'])) ?>
+                            &middot; <?= $escaper->escapeHtml($item['dropship'] ? __('Dropship') : __('Print')) ?>
+                        </label>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+        <div class="admin__field" style="margin-top: 1rem;">
+            <label class="admin__field-label" for="printess-copy-message">
+                <strong><?= $escaper->escapeHtml(__('Message to the customer')) ?></strong>
+            </label>
+            <div class="admin__field-control">
+                <textarea class="admin__control-textarea" name="copy_message" id="printess-copy-message" rows="3"
+                          maxlength="1000" style="width: 100%; max-width: 60rem;"
+                ><?= $escaper->escapeHtml($block->getDefaultMessage()) ?></textarea>
+                <div class="admin__field-note">
+                    <?= $escaper->escapeHtml(__(
+                        'Shown as the order comment of the copy and as the title of its discount line (the title '
+                        . 'shows the first 255 characters).'
+                    )) ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin__field admin__field-option" style="margin-top: 1rem;">
+            <input type="checkbox" class="admin__control-checkbox" name="copy_reduce_stock" value="1"
+                   id="printess-copy-reduce-stock"/>
+            <label class="admin__field-label" for="printess-copy-reduce-stock">
+                <?= $escaper->escapeHtml(__('Reduce stock for the copy')) ?>
+            </label>
+        </div>
+
+        <div style="margin-top: 1.5rem;">
+            <button type="submit" class="action-primary printess-batch-copy-button"
+                    formaction="<?= $escaper->escapeUrl($block->getReproduceUrl()) ?>"
+                    data-printess-empty="<?= $escaper->escapeHtmlAttr(__('Select at least one item for the copy.')) ?>">
+                <span><?= $escaper->escapeHtml(__('Duplicate order and send copy')) ?></span>
+            </button>
+        </div>
+    </div>
+</fieldset>
+<?php
+// Shows the copy fields only while "duplicate" is chosen and keeps exactly one submit button enabled, so Enter or a
+// stray click can never send the other action. Bound via a script (no inline handlers) for the admin CSP.
+$script = <<<JS
+(function () {
+    var choice = document.querySelector('.printess-batch-choice');
+    if (!choice) {
+        return;
+    }
+    var form = choice.closest('form');
+    var fields = choice.querySelector('.printess-batch-copy-fields');
+    var copyButton = choice.querySelector('.printess-batch-copy-button');
+    function update() {
+        var checked = choice.querySelector('input[name="reproduction_choice"]:checked');
+        var copy = !!checked && checked.value === 'copy';
+        // style.display rather than [hidden]: admin button styles set their own display value.
+        fields.style.display = copy ? '' : 'none';
+        copyButton.disabled = !copy;
+        // Looked up on every call: this script runs inside the form, before the page's own resend button exists.
+        var resendButtons = form ? form.querySelectorAll('.printess-batch-resend-button') : [];
+        resendButtons.forEach(function (button) {
+            button.style.display = copy ? 'none' : '';
+            button.disabled = copy;
+        });
+    }
+    choice.querySelectorAll('input[name="reproduction_choice"]').forEach(function (radio) {
+        radio.addEventListener('change', update);
+    });
+    if (form && copyButton) {
+        copyButton.addEventListener('click', function (event) {
+            if (!form.querySelector('input[name="copy_items[]"]:checked')) {
+                event.preventDefault();
+                window.alert(copyButton.getAttribute('data-printess-empty'));
+            }
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', update);
+    } else {
+        update();
+    }
+})();
+JS;
+?>
+<?php if (isset($secureRenderer)): ?>
+    <?= /* @noEscape */ $secureRenderer->renderTag('script', [], $script, false) ?>
+<?php else: ?>
+    <script><?= /* @noEscape */ $script ?></script>
+<?php endif; ?>

@@ -6,6 +6,10 @@
              instance="Printess\PrintessEditor\Cron\ProducePdf" method="execute">
             <schedule>*/5 * * * *</schedule>
         </job>
+        <job name="printess_sync_dropship_orders"
+             instance="Printess\PrintessEditor\Cron\SyncDropshipOrders" method="execute">
+            <schedule>*/30 * * * *</schedule>
+        </job>
         <job name="printess_send_project_reminders"
              instance="Printess\PrintessEditor\Cron\SendProjectReminders" method="execute">
             <config_path>printess_designer/cron/send_project_reminders</config_path>

@@ -4,43 +4,54 @@ declare(strict_types=1);
 
 namespace Printess\PrintessEditor\Cron;
 
-use Magento\Framework\Filesystem;
-use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\Lock\LockManagerInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
-use Printess\PrintessEditor\Helper\Config;
+use Magento\Store\Model\StoreManagerInterface;
 use Printess\PrintessEditor\Model\PdfJob;
-use Printess\PrintessEditor\Model\PrintessApi;
-use Printess\PrintessEditor\Model\ResourceModel\PdfJob as PdfJobResource;
+use Printess\PrintessEditor\Model\PdfJobRepository;
+use Printess\PrintessEditor\Model\PrintessApiException;
+use Printess\PrintessEditor\Model\PrintessApiProvider;
+use Printess\PrintessEditor\Model\Production\JobSubmitter;
+use Printess\PrintessEditor\Model\Production\OrderStageUpdater;
+use Printess\PrintessEditor\Model\Production\PaymentReleaser;
+use Printess\PrintessEditor\Model\Production\RenderResultHandler;
+use Printess\PrintessEditor\Model\ResourceModel\PdfJob\Collection;
 use Printess\PrintessEditor\Model\ResourceModel\PdfJob\CollectionFactory;
 use Psr\Log\LoggerInterface;
 
 /**
- * Processes the printess_pdf_jobs queue in two phases each cron run:
+ * Orchestrates the printess_pdf_jobs queue every cron run (every 5 minutes, see crontab.xml):
  *
- *  Phase 1 — pending jobs:
- *    Call produce() to submit the job to the Printess API.
- *    Store the returned printess_job_id and advance status to 'producing'.
+ *  1. release   — paid awaiting_payment jobs move on (PaymentReleaser).
+ *  2. stale     — dropship jobs stuck in `submitting` > 10 min died mid-request: their outcome is unknown,
+ *                 so they are failed for an admin to check instead of being resent (duplicate shipment).
+ *  3. submit    — pending jobs are sent to Printess (JobSubmitter): print jobs one by one, dropship jobs as one
+ *                 group per order.
+ *  4. poll      — producing jobs are checked via /production/status/get: always in poll mode, and in
+ *                 callback mode only as a fallback when no callback arrived within 2 hours.
  *
- *  Phase 2 — producing jobs:
- *    Call getJobStatus() once (no polling — the next cron run will re-check).
- *    If the job is finished successfully, download the PDF and mark 'complete'.
- *    If the job failed, increment fail_count.  Once fail_count >= MAX_FAIL_COUNT
- *    the job is marked 'failed' and will not be retried.
- *
- * Runs every 5 minutes via crontab.xml.
+ * Service tokens are per store; jobs of stores without one are skipped with a warning.
  */
 class ProducePdf
 {
-    private const LOCK_NAME  = 'printess_produce_pdf';
-    private const BATCH_SIZE = 50;
+    private const LOCK_NAME          = 'printess_produce_pdf';
+    private const BATCH_SIZE         = 50;
+    private const STALE_SUBMIT_SECS  = 600;
+    private const CALLBACK_WAIT_SECS = 7200;
+
+    /** @var array<int, bool> store id => has token, per run */
+    private array $tokenCache = [];
 
     public function __construct(
-        private readonly Config $config,
         private readonly CollectionFactory $collectionFactory,
-        private readonly PdfJobResource $pdfJobResource,
+        private readonly PdfJobRepository $pdfJobRepository,
+        private readonly PaymentReleaser $paymentReleaser,
+        private readonly JobSubmitter $jobSubmitter,
+        private readonly RenderResultHandler $renderResultHandler,
+        private readonly OrderStageUpdater $stageUpdater,
+        private readonly PrintessApiProvider $apiProvider,
+        private readonly StoreManagerInterface $storeManager,
         private readonly OrderRepositoryInterface $orderRepository,
-        private readonly Filesystem $filesystem,
         private readonly LockManagerInterface $lockManager,
         private readonly LoggerInterface $logger
     ) {
@@ -52,207 +63,210 @@ class ProducePdf
             return; // another cron run is still working
         }
 
+        $this->tokenCache = [];
+
         try {
-            $serviceToken = $this->config->getServiceToken();
-            if (empty($serviceToken)) {
-                $this->logger->warning('Printess: no service token configured — PDF production cron skipped.');
-                return;
-            }
-
-            $api = new PrintessApi($serviceToken);
-
-            $this->processPendingJobs($api);
-            $this->processProducingJobs($api);
+            $this->runStep('release', fn () => $this->paymentReleaser->releasePaidJobs());
+            $this->runStep('stale sweep', fn () => $this->sweepStaleSubmissions());
+            $this->runStep('submit', fn () => $this->submitPendingJobs());
+            $this->runStep('poll', fn () => $this->pollProducingJobs());
         } finally {
             $this->lockManager->unlock(self::LOCK_NAME);
         }
     }
 
-    /**
-     * Phase 1: submit pending jobs to the Printess production API.
-     */
-    private function processPendingJobs(PrintessApi $api): void
+    /** One failing step must not stop the others. */
+    private function runStep(string $name, callable $step): void
+    {
+        try {
+            $step();
+        } catch (\Throwable $e) {
+            $this->logger->error('Printess: production cron step "' . $name . '" failed: ' . $e->getMessage(), [
+                'exception' => $e,
+            ]);
+        }
+    }
+
+    private function sweepStaleSubmissions(): void
+    {
+        $cutoff     = gmdate('Y-m-d H:i:s', time() - self::STALE_SUBMIT_SECS);
+        $collection = $this->collectionFactory->create();
+        $collection->addFieldToFilter('status', PdfJob::STATUS_SUBMITTING);
+        $collection->addFieldToFilter('submitted_at', [['lt' => $cutoff], ['null' => true]]);
+        $collection->setOrder('job_id', Collection::SORT_ORDER_ASC);
+        $collection->setPageSize(self::BATCH_SIZE);
+
+        /** @var PdfJob $job */
+        foreach ($collection as $job) {
+            try {
+                $message = 'Dropship submission was interrupted; it may or may not have reached Printess.';
+                $job->setData('status', PdfJob::STATUS_FAILED);
+                $job->setData('error_code', 'outcome_unknown');
+                $job->setData('error_message', $message);
+                $job->appendHistory(['status' => PdfJob::STATUS_FAILED, 'error_code' => 'outcome_unknown', 'error' => $message]);
+                $this->pdfJobRepository->save($job);
+
+                $this->logger->error('Printess: stale dropship submission flagged', ['job_id' => $job->getId()]);
+
+                $this->stageUpdater->update(
+                    (int) $job->getData('order_id'),
+                    sprintf(
+                        'Printess: the dropship submission of item #%d was interrupted and its outcome is unknown. '
+                        . 'Check the Printess order list before restarting it, otherwise the item may be produced and shipped twice.',
+                        (int) $job->getData('order_item_id')
+                    )
+                );
+            } catch (\Throwable $e) {
+                $this->logger->error('Printess: could not flag stale submission', [
+                    'job_id' => $job->getId(), 'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    private function submitPendingJobs(): void
     {
         $collection = $this->collectionFactory->create();
         $collection->addFieldToFilter('status', PdfJob::STATUS_PENDING);
+        $this->excludeStoresWithoutToken($collection);
+        $collection->setOrder('job_id', Collection::SORT_ORDER_ASC);
         $collection->setPageSize(self::BATCH_SIZE);
 
-        $printSettings = $this->config->getPrintSettings();
-
+        // Dropship jobs are sent as one group per order (never item by item, see JobSubmitter::submitDropshipGroup);
+        // print jobs one by one.
+        $dropshipOrders = [];
+        /** @var PdfJob $job */
         foreach ($collection as $job) {
-            try {
-                $printessJobId = $api->produce(
-                    (string) $job->getData('save_token'),
-                    (string) $job->getData('order_id'),
-                    $printSettings
-                );
-
-                $job->setData('printess_job_id', $printessJobId);
-                $job->setData('status', PdfJob::STATUS_PRODUCING);
-                $this->pdfJobResource->save($job);
-
-                $this->logger->info('Printess: submitted PDF job', [
-                    'job_id'           => $job->getId(),
-                    'order_id'         => $job->getData('order_id'),
-                    'printess_job_id'  => $printessJobId,
-                ]);
-            } catch (\Throwable $e) {
-                $this->recordFailure($job, 'produce() failed: ' . $e->getMessage());
+            if ($job->isDropship()) {
+                $dropshipOrders[(int) $job->getData('order_id')] = true;
+                continue;
             }
+            $this->jobSubmitter->submit($job); // never throws
         }
+
+        foreach (array_keys($dropshipOrders) as $orderId) {
+            // Re-reads every pending dropship job of the order, so the page size can never split a group.
+            $this->jobSubmitter->submitDropshipGroup($orderId); // never throws
+        }
+    }
+
+    private function pollProducingJobs(): void
+    {
+        $cutoff     = gmdate('Y-m-d H:i:s', time() - self::CALLBACK_WAIT_SECS);
+        $collection = $this->collectionFactory->create();
+        $collection->addFieldToFilter('status', PdfJob::STATUS_PRODUCING);
+        // OR across fields: poll mode, or a callback that is overdue (or of unknown age).
+        $collection->addFieldToFilter(
+            ['callback_mode', 'submitted_at', 'submitted_at'],
+            [['neq' => PdfJob::CALLBACK_MODE_CALLBACK], ['lt' => $cutoff], ['null' => true]]
+        );
+        $this->excludeStoresWithoutToken($collection);
+        $collection->setOrder('job_id', Collection::SORT_ORDER_ASC);
+        $collection->setPageSize(self::BATCH_SIZE);
+
+        /** @var PdfJob $job */
+        foreach ($collection as $job) {
+            $this->pollJob($job);
+        }
+    }
+
+    private function pollJob(PdfJob $job): void
+    {
+        $printessJobId = (string) $job->getData('printess_job_id');
+        if ($printessJobId === '') {
+            $this->failPolledJob($job, 'no_job_id', 'Producing job has no Printess job id.');
+            return;
+        }
+
+        $storeId = $this->storeIdOf($job);
+        if ($storeId === null || !$this->hasToken($storeId)) {
+            return;
+        }
+
+        try {
+            $status = $this->apiProvider->forStore($storeId)->getJobStatusArray($printessJobId);
+        } catch (PrintessApiException $e) {
+            if ($e->isPermanent()) {
+                $this->failPolledJob($job, 'http_' . $e->getHttpStatus(), $e->getPrintessMessage() ?? $e->getMessage());
+                return;
+            }
+            $this->logger->warning('Printess: status check failed (will retry next run)', [
+                'job_id' => $job->getId(), 'error' => $e->getMessage(),
+            ]);
+            return;
+        } catch (\Throwable $e) {
+            $this->logger->warning('Printess: status check failed (will retry next run)', [
+                'job_id' => $job->getId(), 'error' => $e->getMessage(),
+            ]);
+            return;
+        }
+
+        $this->renderResultHandler->apply($job, $status); // never throws
+    }
+
+    private function failPolledJob(PdfJob $job, string $code, string $message): void
+    {
+        try {
+            $job->setData('status', PdfJob::STATUS_FAILED);
+            $job->setData('error_code', $code);
+            $job->setData('error_message', $message);
+            $job->appendHistory(['status' => PdfJob::STATUS_FAILED, 'error_code' => $code, 'error' => $message]);
+            $this->pdfJobRepository->save($job);
+        } catch (\Throwable $e) {
+            $this->logger->error('Printess: could not save failed job', ['job_id' => $job->getId(), 'error' => $e->getMessage()]);
+            return;
+        }
+
+        $this->stageUpdater->update(
+            (int) $job->getData('order_id'),
+            sprintf('Printess: production of item #%d failed (%s): %s', (int) $job->getData('order_item_id'), $code, $message)
+        );
     }
 
     /**
-     * Phase 2: check in-progress jobs and finalise completed ones.
+     * Rows without store_id (created before the upgrade) are kept; JobSubmitter / storeIdOf() resolve them.
      */
-    private function processProducingJobs(PrintessApi $api): void
+    private function excludeStoresWithoutToken(Collection $collection): void
     {
-        $collection = $this->collectionFactory->create();
-        $collection->addFieldToFilter('status', PdfJob::STATUS_PRODUCING);
-        $collection->setPageSize(self::BATCH_SIZE);
-
-        foreach ($collection as $job) {
-            $printessJobId = (string) $job->getData('printess_job_id');
-            if ($printessJobId === '') {
-                // Should not happen, but guard against it.
-                $this->recordFailure($job, 'producing job has no printess_job_id');
-                continue;
-            }
-
-            try {
-                $status = $api->getJobStatus($printessJobId);
-
-                if (empty($status->isFinalStatus) || $status->isFinalStatus !== true) {
-                    continue; // still in progress — check again next cron run
-                }
-
-                if (empty($status->isSuccess) || $status->isSuccess !== true) {
-                    $this->recordFailure(
-                        $job,
-                        'Printess production failed: ' . json_encode($status->errorDetails ?? 'unknown error')
-                    );
-                    continue;
-                }
-
-                // Job succeeded — find the PDF URL in the result.
-                $pdfUrl = null;
-                foreach ((array) ($status->result->r ?? []) as $url) {
-                    $pdfUrl = $url;
-                    break;
-                }
-
-                if ($pdfUrl === null) {
-                    $this->recordFailure($job, 'Printess job succeeded but result contained no PDF URL');
-                    continue;
-                }
-
-                $filePath = $this->savePdf($pdfUrl, (int) $job->getData('order_id'), (int) $job->getData('order_item_id'));
-
-                $job->setData('status', PdfJob::STATUS_COMPLETE);
-                $job->setData('pdf_path', $filePath);
-                $this->pdfJobResource->save($job);
-
-                $this->addOrderComment(
-                    (int) $job->getData('order_id'),
-                    (int) $job->getData('order_item_id'),
-                    'Printess PDF ready: var/' . $filePath
-                );
-
-                $this->logger->info('Printess: PDF production complete', [
-                    'job_id'    => $job->getId(),
-                    'order_id'  => $job->getData('order_id'),
-                    'pdf_path'  => $filePath,
-                ]);
-            } catch (\Throwable $e) {
-                $this->recordFailure($job, 'status check failed: ' . $e->getMessage());
+        $without = [];
+        foreach ($this->storeManager->getStores(true) as $store) {
+            $storeId = (int) $store->getId();
+            if (!$this->hasToken($storeId)) {
+                $without[] = $storeId;
             }
         }
+
+        if ($without !== []) {
+            $collection->addFieldToFilter('store_id', [['nin' => $without], ['null' => true]]);
+        }
     }
 
-    private function recordFailure(PdfJob $job, string $reason): void
+    private function hasToken(int $storeId): bool
     {
-        $failCount = (int) $job->getData('fail_count') + 1;
-        $job->setData('fail_count', $failCount);
+        if (!isset($this->tokenCache[$storeId])) {
+            $this->tokenCache[$storeId] = $this->apiProvider->hasServiceToken($storeId);
+            if (!$this->tokenCache[$storeId] && $storeId !== 0) {
+                $this->logger->warning('Printess: no service token configured for store ' . $storeId
+                    . ' — its production jobs are skipped.');
+            }
+        }
+        return $this->tokenCache[$storeId];
+    }
 
-        if ($failCount >= PdfJob::MAX_FAIL_COUNT) {
-            $job->setData('status', PdfJob::STATUS_FAILED);
-            $this->addOrderComment(
-                (int) $job->getData('order_id'),
-                (int) $job->getData('order_item_id'),
-                'Printess PDF production failed (gave up after ' . $failCount . ' attempts): ' . $reason
-            );
-            $this->logger->error('Printess: PDF job permanently failed', [
-                'job_id'   => $job->getId(),
-                'order_id' => $job->getData('order_id'),
-                'reason'   => $reason,
-            ]);
-        } else {
-            // Leave status as-is — will retry on the next cron run.
-            $this->logger->warning('Printess: PDF job attempt failed (will retry)', [
-                'job_id'     => $job->getId(),
-                'order_id'   => $job->getData('order_id'),
-                'fail_count' => $failCount,
-                'reason'     => $reason,
-            ]);
+    private function storeIdOf(PdfJob $job): ?int
+    {
+        $storeId = $job->getData('store_id');
+        if ($storeId !== null && $storeId !== '') {
+            return (int) $storeId;
         }
 
         try {
-            $this->pdfJobResource->save($job);
+            return (int) $this->orderRepository->get((int) $job->getData('order_id'))->getStoreId();
         } catch (\Throwable $e) {
-            $this->logger->error('Printess: could not save PDF job failure record', [
-                'job_id' => $job->getId(),
-                'error'  => $e->getMessage(),
+            $this->logger->warning('Printess: could not resolve store of job', [
+                'job_id' => $job->getId(), 'error' => $e->getMessage(),
             ]);
-        }
-    }
-
-    private function savePdf(string $pdfUrl, int $orderId, int $itemId): string
-    {
-        // Only allow https:// downloads to var/.
-        if (!str_starts_with(strtolower($pdfUrl), 'https://')) {
-            throw new \RuntimeException('Refusing to download PDF from non-HTTPS URL: ' . $pdfUrl);
-        }
-
-        $varDir   = $this->filesystem->getDirectoryWrite(DirectoryList::VAR_DIR);
-        $dir      = 'printess/order_' . $orderId;
-        $filePath = $dir . '/item_' . $itemId . '.pdf';
-
-        $varDir->create($dir);
-
-        $ctx = stream_context_create([
-            'http' => ['timeout' => 60],
-            'ssl'  => ['verify_peer' => true, 'verify_peer_name' => true],
-        ]);
-
-        set_error_handler(static function (int $errno, string $errstr) use ($pdfUrl): never {
-            throw new \RuntimeException('Could not download PDF from ' . $pdfUrl . ': ' . $errstr, $errno);
-        });
-        try {
-            $content = file_get_contents($pdfUrl, false, $ctx);
-        } finally {
-            restore_error_handler();
-        }
-
-        if ($content === false) {
-            throw new \RuntimeException('Could not download PDF from ' . $pdfUrl);
-        }
-
-        $varDir->writeFile($filePath, $content);
-
-        return $filePath;
-    }
-
-    private function addOrderComment(int $orderId, int $itemId, string $comment): void
-    {
-        try {
-            $order = $this->orderRepository->get($orderId);
-            $order->addCommentToStatusHistory('Printess [item #' . $itemId . ']: ' . $comment);
-            $this->orderRepository->save($order);
-        } catch (\Throwable $e) {
-            $this->logger->warning('Printess: could not add order comment', [
-                'order_id' => $orderId,
-                'error'    => $e->getMessage(),
-            ]);
+            return null;
         }
     }
 }

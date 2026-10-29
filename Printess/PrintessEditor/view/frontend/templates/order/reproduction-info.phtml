@@ -1,0 +1,24 @@
+<?php
+/**
+ * "Reproduction of order #…" on the customer's order view (PMD-21).
+ *
+ * @var \Printess\PrintessEditor\Block\Order\ReproductionInfo $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+$info = $block->getReproductionOf();
+if ($info === null) {
+    return;
+}
+?>
+<div class="block printess-order-reproduction">
+    <div class="block-content">
+        <p>
+            <?= $escaper->escapeHtml(__('Reproduction of order')) ?>
+            <?php if ($info['url'] !== ''): ?>
+                <a href="<?= $escaper->escapeUrl($info['url']) ?>">#<?= $escaper->escapeHtml($info['increment_id']) ?></a>
+            <?php else: ?>
+                #<?= $escaper->escapeHtml($info['increment_id']) ?>
+            <?php endif; ?>
+        </p>
+    </div>
+</div>

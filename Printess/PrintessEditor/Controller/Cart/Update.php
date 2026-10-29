@@ -116,17 +116,17 @@ class Update implements HttpPostActionInterface
             }
 
             // Fetch authoritative page data from the Printess API — no client-supplied values trusted.
-            // Returns null on API failure.
-            $bookInfo = $this->fetchBookInfo($saveToken);
+            // Only for book products (page-based pricing configured, f24): calendars, cards etc. have no
+            // book pages/spreads structure, so /book/info always fails for them and is not called at all.
+            // Returns null on API failure or when skipped.
+            $pagePricingRaw        = $product->getData('printess_page_pricing');
+            $pagePricingConfigured = !empty(
+                is_array($pagePricingRaw) ? $pagePricingRaw : (json_decode((string)$pagePricingRaw, true) ?: [])
+            );
+            $bookInfo = $pagePricingConfigured ? $this->fetchBookInfo($saveToken) : null;
             if ($bookInfo === null) {
-                // Calendars have no book pages/spreads structure, so /book/info always fails
-                // for them. Only abort when page-based pricing is configured — otherwise fall
-                // back to stored values and continue.
-                $pagePricingRaw        = $product->getData('printess_page_pricing');
-                $pagePricingConfigured = !empty(
-                    is_array($pagePricingRaw) ? $pagePricingRaw : (json_decode((string)$pagePricingRaw, true) ?: [])
-                );
-
+                // Only abort when page-based pricing is configured — otherwise fall back to
+                // stored values and continue.
                 if ($pagePricingConfigured) {
                     return $result->setData([
                         'success' => false,

@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceBlock name="sales_order_tabs">
+            <block class="Printess\PrintessEditor\Block\Adminhtml\Order\View\Tab\Production"
+                   name="printess_order_production_tab"
+                   template="Printess_PrintessEditor::order/production.phtml"/>
+            <action method="addTab">
+                <argument name="name" xsi:type="string">printess_production</argument>
+                <argument name="block" xsi:type="string">printess_order_production_tab</argument>
+            </action>
+        </referenceBlock>
+    </body>
+</page>
