@@ -3,7 +3,7 @@
 require dirname(__DIR__, 6) . '/vendor/autoload.php';
 
 use Printess\PrintessEditor\Model\Product\EditorSettings;
-use Printess\PrintessEditor\Model\PrintessApi;
+use Printess\PrintessEditor\Model\SaveTokenStatus;
 use Printess\PrintessEditor\Model\Product\Attribute\Backend\FormFields;
 use Printess\PrintessEditor\Model\Product\Attribute\Backend\PagePricing;
 
@@ -55,48 +55,18 @@ foreach ([FormFields::class => 'printess_form_fields', PagePricing::class => 'pr
     }
 }
 
-$api = new PrintessApi('test');
-$method = new ReflectionMethod($api, 'isTokenRecordActive');
+// Save-token expiry (merged with the dropshipping branch): PrintessApi::getSaveTokenState() maps the
+// /shop/template/info answer through the pure SaveTokenStatus. Only a definite answer counts as active; error
+// payloads, malformed or past dates are never active. The endpoint/body contract is covered by the live
+// API contract test (A3) and Test/Unit/Model/SaveTokenStatusTest.
 foreach ([[], ['c' => 101, 'm' => 'Error'], ['payload' => []], ['active' => true],
     ['expiresOn' => '1999-01-01T00:00:00Z'], ['expiresOn' => 'bad-date'], ['expiresOn' => '']] as $response) {
-    check($method->invoke($api, $response), false, 'Error/malformed/expired response rejected');
+    check(SaveTokenStatus::fromInfo($response)['state'] === SaveTokenStatus::ACTIVE, false, 'Error/malformed/expired response rejected');
 }
-check($method->invoke($api, ['expiresOn' => null]), true, 'Never-expiring token accepted');
-check($method->invoke($api, ['expiresOn' => gmdate('c', time() + 3600)]), true, 'Future expiration accepted');
+check(SaveTokenStatus::fromInfo(null)['state'], SaveTokenStatus::INACTIVE, '404 (token not found) is inactive');
+check(SaveTokenStatus::fromInfo(['expiresOn' => null])['state'], SaveTokenStatus::ACTIVE, 'Never-expiring token accepted');
+check(SaveTokenStatus::fromInfo(['expiresOn' => gmdate('c', time() + 3600)])['state'], SaveTokenStatus::ACTIVE, 'Future expiration accepted');
 echo "Passed: field conversion, safe partial saves, store inheritance and strict token expiry.\n";
-
-// Read-only fake transport: prove the public API uses the documented path/body.
-class TokenFixtureStream {
-    public $context;
-    public static array $response = [];
-    public static string $url = '';
-    public static array $payload = [];
-    private string $data = '';
-    private int $position = 0;
-    public function stream_open($path, $mode, $options, &$openedPath): bool {
-        self::$url = $path;
-        self::$payload = json_decode(stream_context_get_options($this->context)['http']['content'], true);
-        $this->data = json_encode(self::$response);
-        return true;
-    }
-    public function stream_read($count): string {
-        $data = substr($this->data, $this->position, $count);
-        $this->position += strlen($data);
-        return $data;
-    }
-    public function stream_eof(): bool { return $this->position >= strlen($this->data); }
-    public function stream_stat(): array { return []; }
-}
-stream_wrapper_register('tokenfixture', TokenFixtureStream::class);
-$fixtureApi = new PrintessApi('test', 'tokenfixture://api');
-TokenFixtureStream::$response = ['expiresOn' => null];
-check($fixtureApi->isSaveTokenActive('st:test'), true, 'Documented metadata accepted through public API');
-check(TokenFixtureStream::$url, 'tokenfixture://api/shop/template/info', 'Correct metadata endpoint');
-check(TokenFixtureStream::$payload, ['id' => 'st:test'], 'Correct metadata request body');
-TokenFixtureStream::$response = ['c' => 101, 'm' => 'Invalid token'];
-check($fixtureApi->isSaveTokenActive('st:test'), false, 'Error metadata rejected through public API');
-stream_wrapper_unregister('tokenfixture');
-echo "Passed: public token API endpoint and request contract.\n";
 
 // Exercise the registered modifiers against the same container shape Magento EAV builds.
 if (!function_exists('__')) { function __($text) { return $text; } }

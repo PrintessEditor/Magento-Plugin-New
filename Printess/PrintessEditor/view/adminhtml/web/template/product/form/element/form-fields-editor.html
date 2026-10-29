@@ -20,6 +20,12 @@
 <!-- ko if: !loadingFields() && fieldsError() -->
 <div class="pff-err" data-bind="text: fieldsError"></div>
 <!-- /ko -->
+<!-- ko if: !loadingFields() && baseTemplate() && !baseTemplateError() -->
+<div class="pff-status" data-bind="text: 'Includes form fields of base template \u201C' + baseTemplate() + '\u201D.'"></div>
+<!-- /ko -->
+<!-- ko if: !loadingFields() && baseTemplateError() -->
+<div class="pff-err" data-bind="text: 'Base template' + (baseTemplate() ? ' \u201C' + baseTemplate() + '\u201D' : '') + ' could not be read; showing only the template\'s own form fields. ' + baseTemplateError()"></div>
+<!-- /ko -->
 
 <!-- ko if: rows().length -->
 <div class="pff-row">

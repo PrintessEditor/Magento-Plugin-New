@@ -5,7 +5,8 @@
  * expire) -> if so, reopen it in the Panel editor via the same openFromProduct() path
  * used by the product page and "Continue Editing" (My Projects), so the customer can
  * review/adjust before it's added to the cart as a brand-new item -> if the token has
- * expired, tell the customer and point them at the product page to start a fresh design.
+ * expired, tell the customer and offer a new design on the product template, preset with the
+ * old order's settings (form fields, custom options, variant; f22).
  */
 define([
     'jquery',
@@ -43,10 +44,20 @@ define([
                 stopLoader();
             }
 
-            function showMessage(text, productUrl) {
+            function showMessage(text, productUrl, newDesignConfig) {
                 $message.empty();
                 $message.append($('<span>').text(text));
-                if (productUrl) {
+                if (newDesignConfig) {
+                    // f22: a new design on the product template, preset with the old order's settings.
+                    $message.append(document.createTextNode(' '));
+                    $message.append($('<button type="button" class="action secondary printess-new-design-button">')
+                        .text($t('Start a new design with the same settings'))
+                        .on('click', function (e) {
+                            e.preventDefault();
+                            startLoader();
+                            withEditor(newDesignConfig);
+                        }));
+                } else if (productUrl) {
                     $message.append(document.createTextNode(' '));
                     $message.append($('<a>').attr('href', productUrl).text($t('Start a new design')));
                 }
@@ -72,35 +83,47 @@ define([
                     done();
                     showMessage(
                         response.message || $t('This design is no longer available and needs to be recreated.'),
-                        response.productUrl
+                        response.productUrl,
+                        response.newDesign || null
                     );
                     return;
                 }
 
+                withEditor(response.config);
+            }, function (xhr) {
+                done();
+                showMessage((xhr.responseJSON && xhr.responseJSON.message) || $t('Could not check this design. Please try again.'));
+            });
+
+            function withEditor(editorConfig) {
                 function openIt(openFromProduct) {
                     try {
                         openFromProduct({
-                            shopToken: response.config.shopToken,
-                            panelLoaderUrl: response.config.panelLoaderUrl,
-                            templateName: response.config.templateName,
-                            restoreSavedDesign: true,
+                            shopToken: editorConfig.shopToken,
+                            panelLoaderUrl: editorConfig.panelLoaderUrl,
+                            templateName: editorConfig.templateName,
+                            // PR #8: reopening a saved design restores its own form fields and skips merge
+                            // templates. A new design (f22) must not, or its preset would be dropped.
+                            restoreSavedDesign: editorConfig.restoreSavedDesign !== false,
                             formId: 'product_addtocart_form',
-                            addToCartUrl: response.config.addToCartUrl,
-                            productId: response.config.productId,
-                            formKey: response.config.formKey,
-                            variantOptions: response.config.variantOptions || [],
-                            customOptions: response.config.customOptions || [],
-                            pagePricing: response.config.pagePricing || [],
-                            basePrice: response.config.basePrice || 0,
-                            currencyCode: response.config.currencyCode,
-                            locale: response.config.locale,
-                            theme: response.config.theme,
-                            magicPhotobookTheme: response.config.magicPhotobookTheme,
-                            printSettings: response.config.printSettings,
-                            mergeTemplates: response.config.mergeTemplates,
-                            shopUserId: response.config.shopUserId || '',
-                            productName: response.config.productName || '',
-                            productUrl: response.config.productUrl || '',
+                            addToCartUrl: editorConfig.addToCartUrl,
+                            productId: editorConfig.productId,
+                            formKey: editorConfig.formKey,
+                            variantOptions: editorConfig.variantOptions || [],
+                            customOptions: editorConfig.customOptions || [],
+                            pagePricing: editorConfig.pagePricing || [],
+                            basePrice: editorConfig.basePrice || 0,
+                            currencyCode: editorConfig.currencyCode,
+                            locale: editorConfig.locale,
+                            theme: editorConfig.theme,
+                            magicPhotobookTheme: editorConfig.magicPhotobookTheme,
+                            printSettings: editorConfig.printSettings,
+                            mergeTemplates: editorConfig.mergeTemplates,
+                            predefinedFormFields: editorConfig.predefinedFormFields || [],
+                            presetSelections: editorConfig.presetSelections || null,
+                            shopUserId: editorConfig.shopUserId || '',
+                            productName: editorConfig.productName || '',
+                            productUrl: editorConfig.productUrl || '',
                             isLoggedIn: true
                         });
                     } finally {
@@ -126,10 +149,7 @@ define([
                         content: $t('The Printess editor could not be loaded. Please reload the page and try again.')
                     });
                 });
-            }, function (xhr) {
-                done();
-                showMessage((xhr.responseJSON && xhr.responseJSON.message) || $t('Could not check this design. Please try again.'));
-            });
+            }
         });
     };
 });

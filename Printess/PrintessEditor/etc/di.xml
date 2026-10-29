@@ -42,4 +42,37 @@
                 type="Printess\PrintessEditor\Plugin\Sales\OrderItemOptionsPlugin"/>
     </type>
 
+    <!-- PMD-21 order copy: all of these only act while ReproductionContext is active (see that class). -->
+    <type name="Magento\Tax\Model\Config">
+        <plugin name="printess_reproduction_tax_after_discount"
+                type="Printess\PrintessEditor\Plugin\Tax\ForceTaxAfterDiscount"/>
+    </type>
+    <type name="Magento\Payment\Model\Method\Free">
+        <plugin name="printess_reproduction_allow_free"
+                type="Printess\PrintessEditor\Plugin\Payment\AllowFreeForReproduction"/>
+    </type>
+    <type name="Magento\Quote\Model\Quote">
+        <plugin name="printess_reproduction_skip_minimum_amount"
+                type="Printess\PrintessEditor\Plugin\Quote\SkipMinimumAmountForReproduction"/>
+        <!-- PMD-23: copies the Printess design onto reordered items; only acts while ReorderContext is active. -->
+        <plugin name="printess_add_design_on_reorder"
+                type="Printess\PrintessEditor\Plugin\Quote\AddPrintessDesignOnReorder"/>
+    </type>
+    <!-- PMD-23: the Quote::addProduct plugin is built on every add-to-cart; keep it light. -->
+    <type name="Printess\PrintessEditor\Plugin\Quote\AddPrintessDesignOnReorder">
+        <arguments>
+            <argument name="copier" xsi:type="object">Printess\PrintessEditor\Model\Cart\PrintessOptionsCopier\Proxy</argument>
+        </arguments>
+    </type>
+    <type name="Printess\PrintessEditor\Model\Cart\PrintessOptionsCopier">
+        <arguments>
+            <argument name="customerSession" xsi:type="object">Magento\Customer\Model\Session\Proxy</argument>
+        </arguments>
+    </type>
+    <!-- PMD-23: native storefront/GraphQL reorder never fires checkout_cart_product_add_after. Global scope so the
+         GraphQL reorderItems mutation is covered too. -->
+    <type name="Magento\Sales\Model\Reorder\Reorder">
+        <plugin name="printess_keep_design_on_reorder"
+                type="Printess\PrintessEditor\Plugin\Sales\KeepPrintessDesignOnReorder"/>
+    </type>
 </config>

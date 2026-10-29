@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <!--
+            PMD-21: "Reproduction of order #…" for order copies on the guest order view (Orders and Returns), as on
+            sales_order_view. guest_view: show only the original's number, never a link into the customer account.
+        -->
+        <referenceContainer name="content">
+            <block class="Printess\PrintessEditor\Block\Order\ReproductionInfo"
+                   name="printess.order.reproduction.info"
+                   template="Printess_PrintessEditor::order/reproduction-info.phtml"
+                   after="sales.order.info">
+                <arguments>
+                    <argument name="guest_view" xsi:type="boolean">true</argument>
+                </arguments>
+            </block>
+        </referenceContainer>
+    </body>
+</page>

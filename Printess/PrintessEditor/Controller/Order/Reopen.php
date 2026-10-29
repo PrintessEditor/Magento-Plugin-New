@@ -15,10 +15,13 @@ use Magento\Framework\Data\Form\FormKey\Validator as FormKeyValidator;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\UrlInterface;
+use Magento\Sales\Api\Data\OrderItemInterface;
 use Magento\Sales\Api\OrderItemRepositoryInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Printess\PrintessEditor\Helper\Config as PrintessConfig;
 use Printess\PrintessEditor\Model\PrintessApi;
+use Printess\PrintessEditor\Model\Reorder\NewDesignPreset;
+use Printess\PrintessEditor\Model\SaveTokenStatus;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -28,8 +31,9 @@ use Psr\Log\LoggerInterface;
  * a fresh copy to the cart.
  *
  * Save tokens expire; this deliberately does NOT fall back to silently reordering a blank
- * product when the token has expired — it reports that back so the front end can point the
- * customer at a fresh personalisation instead.
+ * product when the token has expired. It reports that back, with an editor configuration for a NEW
+ * design on the product's template preset with the old order's settings (f22, NewDesignPreset), so
+ * the order page can offer "Start a new design with the same settings".
  *
  * POST /printess/order/reopen
  *   order_item_id  int  Sales order item ID
@@ -117,52 +121,135 @@ class Reopen extends Action implements HttpPostActionInterface
             // Product deleted/disabled — fall through, active will be reported as false below.
         }
 
-        $active = false;
-        $serviceToken = $this->printessConfig->getServiceToken();
+        // Check with the credentials of the store the order was placed in (multi-store setups). Three-way: only a
+        // definite "gone" offers a new design; an outage must not tell the customer their design expired.
+        $orderStoreId = (int) $order->getStoreId() ?: null;
+        $state = SaveTokenStatus::UNKNOWN;
+        $serviceToken = $this->printessConfig->getServiceToken($orderStoreId);
         if ($serviceToken !== '') {
             try {
-                $active = (new PrintessApi($serviceToken))->isSaveTokenActive($saveToken);
+                $state = (new PrintessApi($serviceToken, $this->printessConfig->getApiUrl($orderStoreId)))
+                    ->getSaveTokenState($saveToken);
             } catch (\Throwable $e) {
                 $this->logger->warning('Printess: save token status check failed', ['error' => $e->getMessage()]);
             }
         }
 
-        if (!$active || !$product) {
+        if ($state === SaveTokenStatus::UNKNOWN) {
             return $result->setData([
-                'success'    => true,
-                'active'     => false,
-                'productUrl' => $product ? (string) $product->getProductUrl() : '',
-                'message'    => __('This design is no longer available and needs to be recreated.'),
+                'success' => false,
+                'message' => __('Your design could not be checked right now. Please try again in a moment.'),
             ]);
         }
 
+        if (!$product) {
+            return $result->setData([
+                'success'    => true,
+                'active'     => false,
+                'productUrl' => '',
+                'message'    => __('This product is no longer available, so the design cannot be reordered.'),
+            ]);
+        }
+
+        if ($state === SaveTokenStatus::ACTIVE) {
+            return $result->setData([
+                'success' => true,
+                'active'  => true,
+                'config'  => $this->editorConfig($product, $saveToken, $customerId, $item, false),
+            ]);
+        }
+
+        // f22: the design expired. Offer a new design on the product's template, preset with the old order's settings.
+        $template = trim((string) $product->getData('printess_template'));
         return $result->setData([
-            'success' => true,
-            'active'  => true,
-            'config'  => [
-                'shopToken'           => $this->printessConfig->getShopToken(),
-                'panelLoaderUrl'      => $this->printessConfig->getPanelLoaderUrl(),
-                'templateName'        => $saveToken,
-                'addToCartUrl'        => $this->urlBuilder->getUrl('checkout/cart/add', ['product' => (int) $product->getId()]),
-                'productId'           => (string) $product->getId(),
-                'productName'         => (string) $product->getName(),
-                'productUrl'          => (string) $product->getProductUrl(),
-                'formKey'             => $this->formKey->getFormKey(),
-                'shopUserId'          => (string) $customerId,
-                'variantOptions'      => $this->buildVariantOptions($product),
-                'customOptions'       => $this->buildCustomOptions($product),
-                'pagePricing'         => is_array($product->getData('printess_page_pricing'))
-                    ? $product->getData('printess_page_pricing')
-                    : $this->decodeJsonAttribute((string) $product->getData('printess_page_pricing')),
-                'basePrice'           => (float) $product->getFinalPrice(),
-                'currencyCode'        => (string) $product->getStore()->getCurrentCurrencyCode(),
-                'locale'              => str_replace('_', '-', $this->localeResolver->getLocale()),
-                'theme'               => (string) ($product->getData('printess_theme') ?: $this->printessConfig->getEditorTheme()),
-                'magicPhotobookTheme' => (string) ($product->getData('printess_magic_photobook_theme') ?: ''),
-                'printSettings'       => (string) ($product->getData('printess_print_settings') ?: $this->printessConfig->getPrintSettings()),
-                'mergeTemplates'      => $this->buildMergeTemplates($product),
-            ],
+            'success'    => true,
+            'active'     => false,
+            'productUrl' => (string) $product->getProductUrl(),
+            'message'    => $template !== ''
+                ? __('This design is no longer available. You can start a new design with the same settings as before.')
+                : __('This design is no longer available and needs to be recreated.'),
+            'newDesign'  => $template !== '' ? $this->editorConfig($product, $template, $customerId, $item, true) : null,
         ]);
+    }
+
+    /**
+     * Editor configuration in the shape printess-integration.js openFromProduct() takes. Reopening keeps the
+     * customer's design (template = save token); a new design opens the product template with the old order's
+     * settings as predefined form fields. Both carry the old option/variant selections for the add-to-cart form.
+     *
+     * @return array<string, mixed>
+     */
+    private function editorConfig(
+        ProductInterface $product,
+        string $templateName,
+        int $customerId,
+        OrderItemInterface $item,
+        bool $newDesign
+    ): array {
+        $variantOptions = $this->buildVariantOptions($product);
+        $customOptions  = $this->buildCustomOptions($product);
+        $buyRequest     = $this->buyRequest($item);
+        $productFields  = $product->getData('printess_form_fields');
+        $productFields  = is_array($productFields) ? $productFields : $this->decodeJsonAttribute((string) $productFields);
+
+        return [
+            'shopToken'            => $this->printessConfig->getShopToken(),
+            'panelLoaderUrl'       => $this->printessConfig->getPanelLoaderUrl(),
+            'templateName'         => $templateName,
+            // printess-integration.js: a saved design restores its own fields; a new design uses the preset below.
+            'restoreSavedDesign'   => !$newDesign,
+            'addToCartUrl'         => $this->urlBuilder->getUrl('checkout/cart/add', ['product' => (int) $product->getId()]),
+            'productId'            => (string) $product->getId(),
+            'productName'          => (string) $product->getName(),
+            'productUrl'           => (string) $product->getProductUrl(),
+            'formKey'              => $this->formKey->getFormKey(),
+            'shopUserId'           => (string) $customerId,
+            'variantOptions'       => $variantOptions,
+            'customOptions'        => $customOptions,
+            'predefinedFormFields' => $newDesign
+                ? NewDesignPreset::formFields(
+                    $productFields,
+                    $buyRequest,
+                    $customOptions,
+                    $variantOptions,
+                    $this->savedDesignFields($item)
+                )
+                : [],
+            'presetSelections'     => NewDesignPreset::selections($buyRequest, $customOptions, $variantOptions),
+            'pagePricing'          => is_array($product->getData('printess_page_pricing'))
+                ? $product->getData('printess_page_pricing')
+                : $this->decodeJsonAttribute((string) $product->getData('printess_page_pricing')),
+            'basePrice'            => (float) $product->getFinalPrice(),
+            'currencyCode'         => (string) $product->getStore()->getCurrentCurrencyCode(),
+            'locale'               => str_replace('_', '-', $this->localeResolver->getLocale()),
+            'theme'                => (string) ($product->getData('printess_theme') ?: $this->printessConfig->getEditorTheme()),
+            'magicPhotobookTheme'  => (string) ($product->getData('printess_magic_photobook_theme') ?: ''),
+            'printSettings'        => (string) ($product->getData('printess_print_settings') ?: $this->printessConfig->getPrintSettings()),
+            'mergeTemplates'       => $this->buildMergeTemplates($product),
+        ];
+    }
+
+    /** The `printess_form_fields` option SaveTokenToCart stored from /book/info (PR #8), or null for older orders. */
+    private function savedDesignFields(OrderItemInterface $item): ?string
+    {
+        try {
+            $options = $item->getProductOptionByCode('additional_options');
+        } catch (\Throwable) {
+            return null;
+        }
+        $value = is_array($options) ? ($options['printess_form_fields']['value'] ?? null) : null;
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /** @return array<string, mixed> */
+    private function buyRequest(OrderItemInterface $item): array
+    {
+        try {
+            $value = $item->getProductOptionByCode('info_buyRequest');
+        } catch (\Throwable) {
+            return [];
+        }
+        return is_array($value) ? $value : [];
     }
 
     private function buildVariantOptions(ProductInterface $product): array
