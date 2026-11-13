@@ -130,6 +130,12 @@ $formKey = $block->getFormKey();
                     <th><?= $escaper->escapeHtml(__('Save token')) ?></th>
                     <td><code><?= $escaper->escapeHtml($job['save_token']) ?></code></td>
                 </tr>
+                <?php if (($job['approval'] ?? '') !== ''): ?>
+                    <tr>
+                        <th><?= $escaper->escapeHtml(__('Supervisor approval')) ?></th>
+                        <td><?= $escaper->escapeHtml($job['approval']) ?></td>
+                    </tr>
+                <?php endif; ?>
                 <?php if ($job['printess_job_id'] !== ''): ?>
                     <tr>
                         <th><?= $escaper->escapeHtml(__('Printess job id')) ?></th>

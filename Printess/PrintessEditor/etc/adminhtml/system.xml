@@ -128,6 +128,84 @@
                     <comment>Maximum reminders sent by each cron run.</comment>
                 </field>
             </group>
+            <group id="supervisor_approval" translate="label comment" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Supervisor Approval</label>
+                <comment>Designs of customers must be approved by a Supervisor before they can be ordered. Supervisors are storefront customers with "Printess Supervisor" = Yes (Customers → All Customers → Edit). Supervisor status is website wide.</comment>
+                <field id="enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Supervisor Feedback on orders</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>When enabled, "Add to basket" becomes "Submit for approval" and only approved designs can be added to the cart. Customers must be logged in.</comment>
+                </field>
+                <field id="default_supervisor" translate="label comment" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Default Order Supervisor</label>
+                    <source_model>Printess\PrintessEditor\Model\Config\Source\Supervisors</source_model>
+                    <backend_model>Printess\PrintessEditor\Model\Config\Backend\DefaultSupervisor</backend_model>
+                    <depends><field id="enabled">1</field></depends>
+                    <comment>Notified about new submissions. A product can override this (product attribute "Default Order Supervisor"). With no supervisor set, all supervisors of the website are notified. Every supervisor of the website can review every submission.</comment>
+                </field>
+                <field id="supervisors_need_approval" translate="label comment" type="select" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Supervisors' Own Designs Need Approval</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                    <comment>No: supervisors order their own designs directly. Yes: another supervisor must approve them (nobody can approve their own design).</comment>
+                </field>
+                <field id="edit_lock_minutes" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Supervisor Edit Lock (minutes)</label>
+                    <validate>validate-number validate-greater-than-zero</validate>
+                    <depends><field id="enabled">1</field></depends>
+                    <comment>While a supervisor edits a design, other supervisors cannot act on it for this long.</comment>
+                </field>
+                <field id="notify_on_retract" translate="label comment" type="select" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Notify Supervisor When a Design Is Retracted</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+                <field id="email_identity" translate="label" type="select" sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Email Sender</label>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Identity</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+                <field id="template_submitted" translate="label" type="select" sortOrder="110" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Email Template: Submitted</label>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Template</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+                <field id="template_changes_requested" translate="label" type="select" sortOrder="120" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Email Template: Changes requested</label>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Template</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+                <field id="template_supervisor_changed" translate="label" type="select" sortOrder="130" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Email Template: Supervisor changed</label>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Template</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+                <field id="template_approved" translate="label" type="select" sortOrder="140" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Email Template: Approved</label>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Template</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+                <field id="template_accepted" translate="label" type="select" sortOrder="150" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Email Template: Accepted</label>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Template</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+                <field id="template_replied" translate="label" type="select" sortOrder="160" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Email Template: Replied</label>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Template</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+                <field id="template_retracted" translate="label" type="select" sortOrder="170" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Email Template: Retracted</label>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Template</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+                <field id="template_comment" translate="label" type="select" sortOrder="180" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Email Template: Comment</label>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Template</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+            </group>
             <group id="login_popup" translate="label" type="text" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Login Popup Headings</label>
                 <comment>Text shown in the authentication popup when a guest clicks the Personalise button.</comment>

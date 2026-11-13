@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <update handle="customer_account"/>
+    <head>
+        <css src="Printess_PrintessEditor::css/printess-projects.css"/>
+        <css src="Printess_PrintessEditor::css/printess-approval.css"/>
+    </head>
+    <body>
+        <referenceContainer name="content">
+            <block class="Printess\PrintessEditor\Block\Approval\Detail"
+                   name="printess.approval.detail"
+                   template="Printess_PrintessEditor::approval/detail.phtml"
+                   cacheable="false"/>
+        </referenceContainer>
+    </body>
+</page>

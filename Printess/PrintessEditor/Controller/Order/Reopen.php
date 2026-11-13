@@ -52,7 +52,8 @@ class Reopen extends Action implements HttpPostActionInterface
         private readonly ResolverInterface $localeResolver,
         private readonly FormKey $formKey,
         private readonly UrlInterface $urlBuilder,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly \Printess\PrintessEditor\Model\Approval\ApprovalGate $approvalGate
     ) {
         parent::__construct($context);
     }
@@ -226,6 +227,10 @@ class Reopen extends Action implements HttpPostActionInterface
             'magicPhotobookTheme'  => (string) ($product->getData('printess_magic_photobook_theme') ?: ''),
             'printSettings'        => (string) ($product->getData('printess_print_settings') ?: $this->printessConfig->getPrintSettings()),
             'mergeTemplates'       => $this->buildMergeTemplates($product),
+            // SUP-13: with supervisor approval, Edit & Reorder submits the design for approval instead.
+            'approvalSubmit'       => $this->approvalGate->needsApproval($customerId)
+                ? ['submitUrl' => $this->urlBuilder->getUrl('printess/approval/submit')]
+                : null,
         ];
     }
 

@@ -42,6 +42,12 @@ class RemoveExpiredProjects
             $projects->addFieldToFilter('ordered_at', ['null' => true]);
             $projects->addFieldToFilter('expires_at', ['notnull' => true]);
             $projects->addFieldToFilter('expires_at', ['lteq' => $this->dateTime->gmtDate()]);
+            // SUP-16: never touch a design that is in the supervisor approval process.
+            $projects->getSelect()->where(
+                'NOT EXISTS (SELECT 1 FROM ' . $projects->getTable('printess_approval_submission')
+                . ' AS pas WHERE pas.project_id = main_table.project_id AND pas.status IN (?))',
+                \Printess\PrintessEditor\Model\Approval\Workflow::activeStatuses()
+            );
             $projects->setPageSize(1000);
 
             foreach ($projects as $project) {

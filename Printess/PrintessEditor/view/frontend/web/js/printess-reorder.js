@@ -121,6 +121,7 @@ define([
                             mergeTemplates: editorConfig.mergeTemplates,
                             predefinedFormFields: editorConfig.predefinedFormFields || [],
                             presetSelections: editorConfig.presetSelections || null,
+                            approvalSubmit: editorConfig.approvalSubmit === undefined ? undefined : editorConfig.approvalSubmit,
                             shopUserId: editorConfig.shopUserId || '',
                             productName: editorConfig.productName || '',
                             productUrl: editorConfig.productUrl || '',

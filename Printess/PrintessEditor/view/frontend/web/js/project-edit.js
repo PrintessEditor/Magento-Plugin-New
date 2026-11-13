@@ -27,7 +27,11 @@ define([
             productName: config.productName || '',
             productUrl: config.productUrl || '',
             isLoggedIn: true,
-            projectId: config.projectId || null
+            projectId: config.projectId || null,
+            // Supervisor approval: submit instead of add to cart / view-only for locked designs
+            approvalSubmit: config.approvalSubmit === undefined ? undefined : config.approvalSubmit,
+            approval: config.approval || null,
+            presetSelections: config.presetSelections || null
         });
     }
 

@@ -64,7 +64,9 @@ class SaveTokenToCart implements ObserverInterface
         ThumbnailUrlValidator $thumbnailUrlValidator,
         CustomerSession $customerSession,
         ProjectManager $projectManager,
-        private readonly DesignPagePricing $designPagePricing
+        private readonly DesignPagePricing $designPagePricing,
+        private readonly \Printess\PrintessEditor\Model\Approval\ApprovalGate $approvalGate,
+        private readonly \Magento\Framework\App\State $appState
     ) {
         $this->request               = $request;
         $this->serializer            = $serializer;
@@ -91,6 +93,8 @@ class SaveTokenToCart implements ObserverInterface
 
         $item = $observer->getQuoteItem();
         $item = $item->getParentItem() ?: $item;
+
+        $this->assertApprovedDesign($item, (string) $params['saveToken']);
 
         $additionalOptions = [];
         if ($existing = $item->getOptionByCode('additional_options')) {
@@ -198,6 +202,32 @@ class SaveTokenToCart implements ObserverInterface
             }
             $this->logger->warning('Printess: project DB sync on cart add failed', ['error' => $e->getMessage()]);
             return null;
+        }
+    }
+
+    /**
+     * SUP-13: with supervisor approval, only approved designs may be added to the cart (storefront and API; the
+     * admin is exempt). Throwing here aborts the add before the cart is saved.
+     */
+    private function assertApprovedDesign($item, string $saveToken): void
+    {
+        try {
+            if ($this->appState->getAreaCode() === \Magento\Framework\App\Area::AREA_ADMINHTML) {
+                return;
+            }
+        } catch (\Throwable) {
+            // no area: treat as storefront
+        }
+        $quote = $item->getQuote();
+        $customerId = (int) ($quote ? $quote->getCustomerId() : 0) ?: (int) $this->customerSession->getCustomerId();
+        $storeId = (int) $item->getStoreId() ?: null;
+        if (!$this->approvalGate->needsApproval($customerId, $storeId)) {
+            return;
+        }
+        if (!$this->approvalGate->isTokenApproved($customerId, $saveToken)) {
+            throw new \Magento\Framework\Exception\LocalizedException(__(
+                'This design needs a supervisor\'s approval before it can be ordered. Submit it for approval first.'
+            ));
         }
     }
 

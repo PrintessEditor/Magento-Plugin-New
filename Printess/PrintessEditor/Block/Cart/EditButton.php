@@ -57,6 +57,8 @@ class EditButton extends Generic
         SerializerInterface $serializer,
         ResolverInterface $localeResolver,
         ProductRepositoryInterface $productRepository,
+        private readonly \Printess\PrintessEditor\Model\Approval\ApprovalGate $approvalGate,
+        private readonly \Magento\Customer\Model\Session $customerSession,
         array $data = []
     ) {
         $this->printessConfig    = $printessConfig;
@@ -110,6 +112,14 @@ class EditButton extends Generic
     public function isPrintessItem(): bool
     {
         return $this->getSaveToken() !== '';
+    }
+
+    /**
+     * SUP-13: designs that need supervisor approval are not edited in the cart (an edit would need a new approval).
+     */
+    public function isEditBlockedByApproval(): bool
+    {
+        return $this->approvalGate->needsApproval((int) $this->customerSession->getCustomerId());
     }
 
     /**

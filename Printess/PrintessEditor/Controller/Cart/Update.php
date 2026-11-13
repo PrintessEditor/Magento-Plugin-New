@@ -50,7 +50,8 @@ class Update implements HttpPostActionInterface
         private StoreManagerInterface $storeManager,
         private LoggerInterface $logger,
         private ThumbnailUrlValidator $thumbnailUrlValidator,
-        private ManagerInterface $eventManager
+        private ManagerInterface $eventManager,
+        private \Printess\PrintessEditor\Model\Approval\ApprovalGate $approvalGate
     ) {
     }
 
@@ -78,6 +79,16 @@ class Update implements HttpPostActionInterface
 
         if (!$itemId || !$saveToken) {
             return $result->setData(['success' => false, 'message' => 'Missing required parameters']);
+        }
+
+        // SUP-13: a changed design must be approved again before it can be ordered.
+        $customerId = (int) $this->customerSession->getCustomerId();
+        if ($this->approvalGate->needsApproval($customerId)
+            && !$this->approvalGate->isTokenApproved($customerId, $saveToken)) {
+            return $result->setData([
+                'success' => false,
+                'message' => (string) __('Changed designs need a supervisor\'s approval. Edit the design from My Projects and submit it for approval.')
+            ]);
         }
 
         try {

@@ -100,6 +100,100 @@
             <column name="order_item_id"/>
         </index>
     </table>
+    <table name="printess_approval_submission" resource="default" engine="innodb" comment="Printess Supervisor Approval Submissions">
+        <column xsi:type="int" name="submission_id" unsigned="true" nullable="false" identity="true" comment="Submission ID"/>
+        <column xsi:type="int" name="project_id" unsigned="true" nullable="false" comment="printess_projects.project_id"/>
+        <column xsi:type="int" name="customer_id" unsigned="true" nullable="false" comment="Submitter customer ID"/>
+        <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" default="0" comment="Store ID"/>
+        <column xsi:type="smallint" name="website_id" unsigned="true" nullable="false" default="0" comment="Website ID (supervisor scope)"/>
+        <column xsi:type="int" name="product_id" unsigned="true" nullable="true" comment="Product ID"/>
+        <column xsi:type="varchar" name="status" nullable="false" length="32" default="submitted" comment="Workflow status"/>
+        <column xsi:type="smallint" name="round" unsigned="true" nullable="false" default="1" comment="Submission round"/>
+        <column xsi:type="varchar" name="submitted_save_token" nullable="true" length="512" comment="Save token under review"/>
+        <column xsi:type="varchar" name="supervisor_save_token" nullable="true" length="512" comment="Save token of the supervisor edit (awaiting acceptance)"/>
+        <column xsi:type="text" name="supervisor_thumbnail_url" nullable="true" comment="Thumbnail of the supervisor edit"/>
+        <column xsi:type="varchar" name="approved_save_token" nullable="true" length="512" comment="Approved save token (orderable)"/>
+        <column xsi:type="mediumtext" name="buy_request_json" nullable="true" comment="Product options + qty chosen at submit (JSON)"/>
+        <column xsi:type="int" name="assigned_supervisor_id" unsigned="true" nullable="true" comment="Resolved Default Order Supervisor"/>
+        <column xsi:type="int" name="editing_supervisor_id" unsigned="true" nullable="true" comment="Supervisor holding the edit lock"/>
+        <column xsi:type="timestamp" name="edit_lock_expires_at" nullable="true" on_update="false" comment="Edit lock expiry"/>
+        <column xsi:type="int" name="last_supervisor_id" unsigned="true" nullable="true" comment="Supervisor who acted last"/>
+        <column xsi:type="int" name="approved_by" unsigned="true" nullable="true" comment="Approving supervisor"/>
+        <column xsi:type="varchar" name="approved_by_name" nullable="true" length="255" comment="Approver name/email snapshot"/>
+        <column xsi:type="smallint" name="supervisor_edited" unsigned="true" nullable="false" default="0" comment="Approved version was edited by a supervisor"/>
+        <column xsi:type="timestamp" name="submitted_at" nullable="true" on_update="false" comment="Last submitted at"/>
+        <column xsi:type="timestamp" name="approved_at" nullable="true" on_update="false" comment="Approved at"/>
+        <column xsi:type="timestamp" name="ordered_at" nullable="true" on_update="false" comment="Ordered at"/>
+        <column xsi:type="int" name="order_id" unsigned="true" nullable="true" comment="sales_order.entity_id"/>
+        <column xsi:type="int" name="version" unsigned="true" nullable="false" default="1" comment="Optimistic lock version"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="false" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true" comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="submission_id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="PRINTESS_APPROVAL_SUBMISSION_PROJECT_ID">
+            <column name="project_id"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="PRINTESS_APPROVAL_SUBM_PROJECT_ID_PRINTESS_PROJECTS_PROJECT_ID"
+                    table="printess_approval_submission" column="project_id"
+                    referenceTable="printess_projects" referenceColumn="project_id" onDelete="CASCADE"/>
+        <constraint xsi:type="foreign" referenceId="PRINTESS_APPROVAL_SUBM_CUSTOMER_ID_CUSTOMER_ENTITY_ENTITY_ID"
+                    table="printess_approval_submission" column="customer_id"
+                    referenceTable="customer_entity" referenceColumn="entity_id" onDelete="CASCADE"/>
+        <constraint xsi:type="foreign" referenceId="PRINTESS_APPROVAL_SUBM_ASSIGNED_SPV_ID_CUSTOMER_ENTITY_ENTITY_ID"
+                    table="printess_approval_submission" column="assigned_supervisor_id"
+                    referenceTable="customer_entity" referenceColumn="entity_id" onDelete="SET NULL"/>
+        <constraint xsi:type="foreign" referenceId="PRINTESS_APPROVAL_SUBM_EDITING_SPV_ID_CUSTOMER_ENTITY_ENTITY_ID"
+                    table="printess_approval_submission" column="editing_supervisor_id"
+                    referenceTable="customer_entity" referenceColumn="entity_id" onDelete="SET NULL"/>
+        <constraint xsi:type="foreign" referenceId="PRINTESS_APPROVAL_SUBM_LAST_SPV_ID_CUSTOMER_ENTITY_ENTITY_ID"
+                    table="printess_approval_submission" column="last_supervisor_id"
+                    referenceTable="customer_entity" referenceColumn="entity_id" onDelete="SET NULL"/>
+        <constraint xsi:type="foreign" referenceId="PRINTESS_APPROVAL_SUBM_APPROVED_BY_CUSTOMER_ENTITY_ENTITY_ID"
+                    table="printess_approval_submission" column="approved_by"
+                    referenceTable="customer_entity" referenceColumn="entity_id" onDelete="SET NULL"/>
+        <index referenceId="PRINTESS_APPROVAL_SUBMISSION_WEBSITE_ID_STATUS" indexType="btree">
+            <column name="website_id"/>
+            <column name="status"/>
+        </index>
+        <index referenceId="PRINTESS_APPROVAL_SUBMISSION_CUSTOMER_ID_STATUS" indexType="btree">
+            <column name="customer_id"/>
+            <column name="status"/>
+        </index>
+        <index referenceId="PRINTESS_APPROVAL_SUBMISSION_APPROVED_SAVE_TOKEN" indexType="btree">
+            <column name="approved_save_token"/>
+        </index>
+    </table>
+
+    <table name="printess_approval_event" resource="default" engine="innodb" comment="Printess Supervisor Approval History and Comments">
+        <column xsi:type="int" name="event_id" unsigned="true" nullable="false" identity="true" comment="Event ID"/>
+        <column xsi:type="int" name="submission_id" unsigned="true" nullable="false" comment="Submission ID"/>
+        <column xsi:type="int" name="actor_customer_id" unsigned="true" nullable="true" comment="Acting customer"/>
+        <column xsi:type="varchar" name="actor_name" nullable="true" length="255" comment="Actor name snapshot"/>
+        <column xsi:type="varchar" name="actor_role" nullable="false" length="16" comment="submitter|supervisor|system"/>
+        <column xsi:type="varchar" name="type" nullable="false" length="32" comment="Workflow action"/>
+        <column xsi:type="varchar" name="status_after" nullable="true" length="32" comment="Status after the event"/>
+        <column xsi:type="text" name="message" nullable="true" comment="Comment / feedback"/>
+        <column xsi:type="varchar" name="save_token" nullable="true" length="512" comment="Design snapshot"/>
+        <column xsi:type="text" name="thumbnail_url" nullable="true" comment="Thumbnail snapshot"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="false" comment="Created At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="event_id"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="PRINTESS_APPROVAL_EVENT_SUBM_ID_PRINTESS_APPROVAL_SUBM_SUBM_ID"
+                    table="printess_approval_event" column="submission_id"
+                    referenceTable="printess_approval_submission" referenceColumn="submission_id" onDelete="CASCADE"/>
+        <constraint xsi:type="foreign" referenceId="PRINTESS_APPROVAL_EVENT_ACTOR_ID_CUSTOMER_ENTITY_ENTITY_ID"
+                    table="printess_approval_event" column="actor_customer_id"
+                    referenceTable="customer_entity" referenceColumn="entity_id" onDelete="SET NULL"/>
+        <index referenceId="PRINTESS_APPROVAL_EVENT_SUBMISSION_ID_CREATED_AT" indexType="btree">
+            <column name="submission_id"/>
+            <column name="created_at"/>
+        </index>
+        <index referenceId="PRINTESS_APPROVAL_EVENT_SAVE_TOKEN" indexType="btree">
+            <column name="save_token"/>
+        </index>
+    </table>
     <table name="sales_order" resource="sales" comment="Sales Flat Order">
         <column xsi:type="text" name="printess_reproduction_of" nullable="true" comment="Printess: JSON describing the order this order reproduces"/>
         <column xsi:type="text" name="printess_reproduced_as" nullable="true" comment="Printess: JSON list of orders that reproduce this order"/>

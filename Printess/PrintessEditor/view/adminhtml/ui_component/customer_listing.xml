@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SUP-04: mass actions to give/remove the Printess Supervisor role. The grid column comes from the customer
+     attribute itself (is_used_in_grid). -->
+<listing xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
+    <listingToolbar name="listing_top">
+        <massaction name="listing_massaction">
+            <action name="printess_assign_supervisor">
+                <settings>
+                    <confirm>
+                        <message translate="true">Give the selected customers the Printess Supervisor role? Supervisors can review and approve the designs of all customers of their website.</message>
+                        <title translate="true">Assign Printess Supervisor role</title>
+                    </confirm>
+                    <url path="printess/supervisor/massAssign"/>
+                    <type>printess_assign_supervisor</type>
+                    <label translate="true">Assign Printess Supervisor role</label>
+                </settings>
+            </action>
+            <action name="printess_remove_supervisor">
+                <settings>
+                    <confirm>
+                        <message translate="true">Remove the Printess Supervisor role from the selected customers?</message>
+                        <title translate="true">Remove Printess Supervisor role</title>
+                    </confirm>
+                    <url path="printess/supervisor/massRemove"/>
+                    <type>printess_remove_supervisor</type>
+                    <label translate="true">Remove Printess Supervisor role</label>
+                </settings>
+            </action>
+        </massaction>
+    </listingToolbar>
+</listing>

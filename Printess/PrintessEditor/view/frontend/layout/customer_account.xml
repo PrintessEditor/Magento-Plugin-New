@@ -3,13 +3,24 @@
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <body>
         <referenceBlock name="customer_account_navigation">
-            <block class="Magento\Framework\View\Element\Html\Link\Current"
+            <block class="Printess\PrintessEditor\Block\Approval\NavLink"
                    name="customer-account-navigation-printess-projects">
                 <arguments>
                     <argument name="path" xsi:type="string">printess/project/index</argument>
                     <argument name="label" xsi:type="string" translate="true">My Projects</argument>
                     <argument name="sortOrder" xsi:type="number">151</argument>
                     <argument name="navigation" xsi:type="boolean">true</argument>
+                    <argument name="mode" xsi:type="string">projects</argument>
+                </arguments>
+            </block>
+            <block class="Printess\PrintessEditor\Block\Approval\NavLink"
+                   name="customer-account-navigation-printess-approval">
+                <arguments>
+                    <argument name="path" xsi:type="string">printess/approval/index</argument>
+                    <argument name="label" xsi:type="string" translate="true">My releasable documents</argument>
+                    <argument name="sortOrder" xsi:type="number">152</argument>
+                    <argument name="navigation" xsi:type="boolean">true</argument>
+                    <argument name="mode" xsi:type="string">supervisor</argument>
                 </arguments>
             </block>
         </referenceBlock>

@@ -2,7 +2,7 @@
  * Printess Editor integration for Magento.
  * Supports both Panel UI (fullscreen) and Slim UI (inline).
  */
-define(['jquery', 'mage/url'], function ($, mageUrl) {
+define(['jquery', 'mage/url', 'mage/translate'], function ($, mageUrl, $t) {
     'use strict';
 
     var DEFAULT_PANEL_LOADER_URL = 'https://editor.printess.com/printess-editor/loader.js';
@@ -27,6 +27,9 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
     var _panelLoadedPhotobookTheme = ''; // product default used for the current editor load
 
     var _cartLoaderOverlay = null;
+    // Supervisor approval (SUP-07): when set, "add to basket" submits the design for approval instead.
+    // { submitUrl, formKey } — set by setApprovalMode() (product page) or a project's editor config.
+    var _approval = null;
 
     function showCartLoader(message) {
         if (_cartLoaderOverlay) { return; }
@@ -1118,6 +1121,10 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
 
     function applyPresetSelections(form, preset) {
         if (!preset || typeof preset !== 'object') return;
+        // Quantity chosen earlier (approval snapshot / reorder); the product page passes no preset.
+        if (preset.qty !== undefined && preset.qty !== null && Number(preset.qty) > 0) {
+            setOrAddHidden(form, 'qty', String(preset.qty));
+        }
         ['super_attribute', 'options'].forEach(function (group) {
             var values = preset[group] || {};
             Object.keys(values).forEach(function (id) {
@@ -1196,9 +1203,226 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
         return form;
     }
 
+
+    // --- supervisor approval helpers (SUP-07/SUP-11) ---
+
+    function escapeText(str) {
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    /**
+     * Modal on top of the editor. opts: title, text, label (textarea label; omit for no textarea),
+     * required (textarea must be filled), confirm (button), cancel (button or false), linkUrl/linkLabel.
+     * Resolves {message} on confirm, null on cancel.
+     */
+    function approvalDialog(opts) {
+        return new Promise(function (resolve) {
+            var overlay = document.createElement('div');
+            overlay.className = 'printess-owned printess-approval-dialog';
+            overlay.setAttribute('role', 'dialog');
+            overlay.setAttribute('aria-modal', 'true');
+            Object.assign(overlay.style, {
+                position: 'fixed', inset: '0', zIndex: '2147483647',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(0,0,0,0.6)'
+            });
+            var html =
+                '<div style="background:#fff;border-radius:8px;padding:28px;width:440px;max-width:92vw;' +
+                'box-shadow:0 8px 32px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;color:#1a1a1a;">' +
+                '<h3 style="margin:0 0 8px;font-size:18px;font-weight:600;">' + escapeText(opts.title) + '</h3>' +
+                (opts.text ? '<p style="margin:0 0 16px;font-size:14px;color:#444;line-height:1.45;">' + escapeText(opts.text) + '</p>' : '');
+            if (opts.label) {
+                html += '<label for="printess-approval-msg" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">' +
+                    escapeText(opts.label) + '</label>' +
+                    '<textarea id="printess-approval-msg" maxlength="2000" rows="4" style="width:100%;box-sizing:border-box;' +
+                    'padding:8px 10px;font-size:14px;border:1px solid #bbb;border-radius:5px;margin-bottom:6px;"></textarea>' +
+                    '<p id="printess-approval-err" style="display:none;color:#b00020;font-size:13px;margin:0 0 8px;"></p>';
+            }
+            html += '<div style="display:flex;gap:12px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap;">';
+            if (opts.cancel !== false) {
+                html += '<button type="button" data-act="cancel" style="padding:9px 18px;border:1px solid #bbb;background:#fff;' +
+                    'border-radius:5px;font-size:14px;cursor:pointer;color:#333;">' + escapeText(opts.cancel || $t('Cancel')) + '</button>';
+            }
+            if (opts.linkUrl) {
+                html += '<a href="' + escapeText(opts.linkUrl) + '" style="padding:9px 18px;background:#1a73e8;color:#fff;' +
+                    'border-radius:5px;font-size:14px;font-weight:600;text-decoration:none;">' + escapeText(opts.linkLabel || opts.confirm) + '</a>';
+            } else {
+                html += '<button type="button" data-act="ok" style="padding:9px 18px;background:#1a73e8;color:#fff;border:none;' +
+                    'border-radius:5px;font-size:14px;font-weight:600;cursor:pointer;">' + escapeText(opts.confirm || $t('OK')) + '</button>';
+            }
+            html += '</div></div>';
+            overlay.innerHTML = html;
+            document.body.appendChild(overlay);
+            var area = overlay.querySelector('#printess-approval-msg');
+            function done(value) {
+                if (overlay.parentNode) { overlay.parentNode.removeChild(overlay); }
+                resolve(value);
+            }
+            var ok = overlay.querySelector('[data-act="ok"]');
+            if (ok) {
+                ok.addEventListener('click', function () {
+                    var message = area ? area.value.trim() : '';
+                    if (opts.required && message === '') {
+                        var err = overlay.querySelector('#printess-approval-err');
+                        err.textContent = $t('Please enter a message.');
+                        err.style.display = 'block';
+                        area.focus();
+                        return;
+                    }
+                    done({ message: message });
+                });
+            }
+            var cancel = overlay.querySelector('[data-act="cancel"]');
+            if (cancel) { cancel.addEventListener('click', function () { done(null); }); }
+            overlay.addEventListener('keydown', function (e) { if (e.key === 'Escape' && opts.cancel !== false) { done(null); } });
+            setTimeout(function () { (area || ok || cancel).focus(); }, 50);
+        });
+    }
+
+    /** Product options of the add-to-cart form as a buy request {product, qty, super_attribute, options}. */
+    function formToBuyRequest(form) {
+        var buy = { super_attribute: {}, options: {} };
+        new FormData(form).forEach(function (value, key) {
+            var m = key.match(/^(super_attribute|options)\[(\d+)\]$/);
+            if (m) { buy[m[1]][m[2]] = String(value); return; }
+            if (key === 'qty') { buy.qty = String(value); }
+            if (key === 'product') { buy.product = String(value); }
+        });
+        return buy;
+    }
+
+    async function postApproval(url, fields) {
+        var fd = new FormData();
+        fd.append('form_key', resolveFormKey(fields.form_key));
+        Object.keys(fields).forEach(function (k) {
+            if (k !== 'form_key' && fields[k] !== null && fields[k] !== undefined) { fd.append(k, fields[k]); }
+        });
+        var resp = await fetch(url, {
+            method: 'POST', body: fd, credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        try { return await resp.json(); } catch (e) { return { success: false }; }
+    }
+
+    async function submitDesignForApproval(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef) {
+        // Ask first whether this customer needs approval at all (supervisors may order directly, and the product
+        // page itself can be served from the full-page cache).
+        var check = await postApproval(_approval.submitUrl, { form_key: _approval.formKey, check: '1' });
+        if (check && check.direct) {
+            return postFormToCartDirect(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef);
+        }
+        hideCartLoader();
+        if (check && check.login) {
+            await approvalDialog({
+                title: $t('Please sign in'),
+                text: $t('Designs have to be approved by a supervisor before they can be ordered. Sign in to submit your design for approval.'),
+                cancel: $t('Cancel'),
+                linkUrl: mageUrl.build('customer/account/login'),
+                linkLabel: $t('Sign in')
+            });
+            return;
+        }
+        ensureMagentoOptionInputs(form, variantOptions, customOptions);
+        var buy = formToBuyRequest(form);
+        var answer = await approvalDialog({
+            title: $t('Submit for approval'),
+            text: $t('A supervisor has to approve this design before it can be ordered. You cannot change it while it is being reviewed, but you can retract it.'),
+            label: $t('Message for the supervisor (optional)'),
+            confirm: $t('Submit for approval')
+        });
+        if (!answer) { return; }
+        showCartLoader($t('Submitting for approval...'));
+        var projectInput = form.querySelector('[name="printessProjectId"]');
+        var data = await postApproval(_approval.submitUrl, {
+            form_key: _approval.formKey,
+            save_token: saveToken || '',
+            thumbnail_url: thumbnailUrl || '',
+            product_id: buy.product || '',
+            project_id: projectInput && projectInput.value ? projectInput.value : null,
+            message: answer.message,
+            buy_request: JSON.stringify(buy)
+        });
+        hideCartLoader();
+        if (data && data.direct) {
+            // This customer does not need approval (e.g. a supervisor): normal add to cart.
+            showCartLoader($t('Adding to Cart...'));
+            return postFormToCartDirect(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef);
+        }
+        if (!data || data.success !== true) {
+            await approvalDialog({
+                title: $t('The design could not be submitted'),
+                text: (data && data.message) || $t('Please try again.'),
+                cancel: false,
+                confirm: $t('OK')
+            });
+            return;
+        }
+        closePanelEditor();
+        await approvalDialog({
+            title: $t('Submitted for approval'),
+            text: data.message,
+            cancel: $t('Close'),
+            linkUrl: data.detail_url,
+            linkLabel: $t('View status')
+        });
+        // Closed on an account page (My Projects / approval details): show the new status (SUP-B08).
+        if (/\/printess\/(project|approval)\//.test(window.location.pathname + '/')) {
+            window.location.reload();
+        }
+    }
+
+    /** Supervisor finished editing (SUP-11): save the edited design and mark it approved. */
+    async function saveSupervisorEdit(cfg, saveToken, thumbnailUrl) {
+        var form = getOrCreateCartForm({
+            formId: 'printess_supervisor_form',
+            addToCartUrl: cfg.addToCartUrl || '#',
+            productId: cfg.productId || '',
+            formKey: cfg.formKey || ''
+        });
+        applyPresetSelections(form, cfg.presetSelections);
+        ensureMagentoOptionInputs(form, cfg.variantOptions || [], cfg.customOptions || []);
+        var buy = formToBuyRequest(form);
+        if (cfg.presetSelections && cfg.presetSelections.qty) { buy.qty = String(cfg.presetSelections.qty); }
+        var answer = await approvalDialog({
+            title: $t('Save changes and approve'),
+            text: $t('The customer will be asked to accept your changes. Once they accept, the design can be ordered.'),
+            label: $t('Note for the customer (optional)'),
+            confirm: $t('Save and approve')
+        });
+        if (!answer) { return; }
+        showCartLoader($t('Saving...'));
+        var data = await postApproval(cfg.approval.saveEditUrl, {
+            form_key: cfg.formKey,
+            submission_id: cfg.approval.submissionId,
+            save_token: saveToken || '',
+            thumbnail_url: thumbnailUrl || '',
+            buy_request: JSON.stringify(buy),
+            message: answer.message
+        });
+        hideCartLoader();
+        if (!data || data.success !== true) {
+            await approvalDialog({
+                title: $t('Your changes could not be saved'),
+                text: (data && data.message) || $t('Please try again.'),
+                cancel: false
+            });
+            return;
+        }
+        closePanelEditor();
+        window.location.href = data.redirect || cfg.approval.viewUrl;
+    }
+
     // Page count, included pages and form fields are no longer posted from the
     // browser: SaveTokenToCart reads them server-side from Printess /book/info.
     async function postFormToCart(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef) {
+        if (_approval && _approval.submitUrl) {
+            return submitDesignForApproval(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef);
+        }
+        return postFormToCartDirect(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef);
+    }
+
+    async function postFormToCartDirect(form, saveToken, thumbnailUrl, variantOptions, customOptions, apiRef) {
         ensureMagentoOptionInputs(form, variantOptions, customOptions);
         setOrAddHidden(form, 'saveToken', saveToken || '');
         setOrAddHidden(form, 'thumbnailUrl', thumbnailUrl || '');
@@ -1221,6 +1445,16 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
     return {
 
         promptProjectName: promptProjectName,
+
+        /**
+         * Supervisor approval is enabled for this store (SUP-07): "add to basket" submits the design for approval.
+         * cfg: { submitUrl, formKey? } or null to switch it off.
+         */
+        setApprovalMode: function (cfg) {
+            _approval = cfg && cfg.submitUrl ? cfg : null;
+        },
+
+        approvalDialog: approvalDialog,
         showCartLoader: showCartLoader,
         hideCartLoader: hideCartLoader,
 
@@ -1228,6 +1462,10 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
          * Panel UI — product page "Customize" button.
          */
         openFromProduct: function (cfg) {
+            if (cfg.approvalSubmit !== undefined) {
+                _approval = cfg.approvalSubmit && cfg.approvalSubmit.submitUrl ? cfg.approvalSubmit : null;
+            }
+            var approvalMode = cfg.approval && cfg.approval.mode ? cfg.approval.mode : null;
             var variantOptions = cfg.variantOptions || [];
             var customOptions = cfg.customOptions || [];
             // console.warn('[Printess] openFromProduct', { variantOptions: variantOptions, customOptions: customOptions });
@@ -1256,6 +1494,17 @@ define(['jquery', 'mage/url'], function ($, mageUrl) {
                 projectId: cfg.projectId || null,
                 onShopLogin: cfg.onShopLogin || null,
                 onAddToBasket: async function (saveToken, thumbnailUrl, apiRef) {
+                    if (approvalMode === 'edit') {
+                        return saveSupervisorEdit(cfg, saveToken, thumbnailUrl);
+                    }
+                    if (approvalMode === 'view') {
+                        await approvalDialog({
+                            title: $t('View only'),
+                            text: cfg.approval.viewText || $t('This design is in the approval process and cannot be changed or ordered from here.'),
+                            cancel: false
+                        });
+                        return;
+                    }
                     var form = getOrCreateCartForm({
                         formId: cfg.formId || 'product_addtocart_form',
                         addToCartUrl: cfg.addToCartUrl || '',

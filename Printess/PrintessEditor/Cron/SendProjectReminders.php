@@ -70,6 +70,12 @@ class SendProjectReminders
         $collection->addFieldToFilter('expires_at', ['notnull' => true]);
         $collection->addFieldToFilter('expires_at', ['gt' => $this->dateTime->gmtDate()]);
         $collection->addFieldToFilter('ordered_at', ['null' => true]);
+        // SUP-16: never touch a design that is in the supervisor approval process.
+        $collection->getSelect()->where(
+            'NOT EXISTS (SELECT 1 FROM ' . $collection->getTable('printess_approval_submission')
+            . ' AS pas WHERE pas.project_id = main_table.project_id AND pas.status IN (?))',
+            \Printess\PrintessEditor\Model\Approval\Workflow::activeStatuses()
+        );
         $collection->getSelect()->where(
             'order_reminder_sent_at IS NULL OR removal_reminder_sent_at IS NULL'
         );

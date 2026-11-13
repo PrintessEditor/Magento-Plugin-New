@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Printess\PrintessEditor\Model;
 
+use Magento\Framework\Exception\LocalizedException;
 use Printess\PrintessEditor\Model\ResourceModel\Project as ProjectResource;
 use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Framework\Exception\AuthorizationException;
@@ -23,7 +24,10 @@ class ProjectManager
         private readonly ProjectConfig $projectConfig,
         private readonly StoreManagerInterface $storeManager,
         private readonly DateTime $dateTime,
-        private readonly ThumbnailUrlValidator $thumbnailUrlValidator
+        private readonly ThumbnailUrlValidator $thumbnailUrlValidator,
+        private readonly \Printess\PrintessEditor\Model\Approval\SubmissionRepository $submissionRepository,
+        private readonly \Printess\PrintessEditor\Model\Approval\Workflow $approvalWorkflow,
+        private readonly \Printess\PrintessEditor\Model\Approval\ApprovalConfig $approvalConfig
     ) {
     }
 
@@ -55,6 +59,13 @@ class ProjectManager
 
         if ($project->getId() && (int) $project->getData('product_id') !== $productId) {
             throw new AuthorizationException(__('The project does not belong to this product.'));
+        }
+
+        // SUP-08: a design under supervisor review (or approved) must not change. Saving the same token again
+        // (e.g. adding the approved design to the cart) is fine.
+        if ($project->getId() && $saveToken !== (string) $project->getData('save_token')
+            && $this->approvalConfig->isEnabled((int) $project->getData('store_id'))) {
+            $this->assertEditable((int) $project->getId());
         }
 
         if (!$project->getId()) {
@@ -114,7 +125,15 @@ class ProjectManager
     public function delete(int $projectId, int $customerId): void
     {
         $this->assertCustomer($customerId);
-        $this->projectResource->delete($this->getOwnedProject($projectId, $customerId));
+        $project = $this->getOwnedProject($projectId, $customerId);
+        $submission = $this->submissionRepository->getByProjectId($projectId);
+        if ($submission !== null && $this->approvalWorkflow->isLocked($submission->getStatus())
+            && $this->approvalConfig->isEnabled((int) $project->getData('store_id'))) {
+            throw new LocalizedException(__(
+                'This design is in the approval process and cannot be deleted. Retract it first.'
+            ));
+        }
+        $this->projectResource->delete($project);
     }
 
     public function getOwnedProject(int $projectId, int $customerId): Project
@@ -132,6 +151,19 @@ class ProjectManager
         }
 
         return $project;
+    }
+
+    /**
+     * Throws when the project's design is locked by the supervisor approval workflow.
+     */
+    public function assertEditable(int $projectId): void
+    {
+        $submission = $this->submissionRepository->getByProjectId($projectId);
+        if ($submission !== null && !$this->approvalWorkflow->isEditableBySubmitter($submission->getStatus())) {
+            throw new LocalizedException(__(
+                'This design is locked while it is in the approval process. Retract it or wait for the supervisor.'
+            ));
+        }
     }
 
     private function getDefaultName(string $productName): string

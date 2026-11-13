@@ -13,7 +13,23 @@ class PrintessData implements ArgumentInterface
     public function __construct(
         private readonly LocaleResolver  $localeResolver,
         private readonly CustomerSession $customerSession,
+        private readonly \Printess\PrintessEditor\Model\Approval\ApprovalConfig $approvalConfig,
+        private readonly \Magento\Framework\UrlInterface $urlBuilder,
     ) {}
+
+    /**
+     * SUP-07: store-level flag (safe for full-page cache). Whether *this* customer needs approval is decided by the
+     * submit endpoint (supervisors may order directly).
+     */
+    public function isApprovalEnabled(): bool
+    {
+        return $this->approvalConfig->isEnabled();
+    }
+
+    public function getApprovalSubmitUrl(): string
+    {
+        return $this->urlBuilder->getUrl('printess/approval/submit');
+    }
 
     public function getLocale(): string
     {

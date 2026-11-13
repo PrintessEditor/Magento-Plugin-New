@@ -4,6 +4,7 @@
     <update handle="customer_account"/>
     <head>
         <css src="Printess_PrintessEditor::css/printess-projects.css"/>
+        <css src="Printess_PrintessEditor::css/printess-approval.css"/>
     </head>
     <body>
         <referenceContainer name="content">

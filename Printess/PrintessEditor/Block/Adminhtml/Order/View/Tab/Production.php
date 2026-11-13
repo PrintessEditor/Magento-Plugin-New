@@ -347,6 +347,10 @@ class Production extends Template implements TabInterface
             'item_name'           => $item ? (string) $item->getName() : (string) __('Order item #%1', $itemId),
             'sku'                 => $item ? (string) $item->getSku() : '',
             'save_token'          => (string) $job->getData('save_token'),
+            // SUP-17: supervisor approval snapshot (empty when the store does not use approval)
+            'approval'            => $item
+                ? (string) (($item->getProductOptions()['additional_options']['printess_approval']['value'] ?? '') ?: '')
+                : '',
             'copies'              => (int) $job->getData('copies'),
             'is_dropship'         => $job->isDropship(),
             'type_label'          => $this->typeLabel($job),

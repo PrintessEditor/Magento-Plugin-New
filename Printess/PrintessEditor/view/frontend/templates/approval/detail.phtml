@@ -1,0 +1,227 @@
+<?php
+/**
+ * SUP-08/09/10/11/12: one design in the approval process (submitter or supervisor view).
+ *
+ * @var \Printess\PrintessEditor\Block\Approval\Detail $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+use Printess\PrintessEditor\Model\Approval\Workflow as W;
+
+$project = $block->getProject();
+$submission = $block->getSubmission();
+$isSupervisor = $block->isSupervisorView();
+$status = $block->getStatus();
+$postUrl = $block->getPostUrl();
+$idField = $isSupervisor ? 'submission_id' : 'project_id';
+$idValue = $isSupervisor ? (int) $submission->getId() : (int) $project->getId();
+$hidden = static function (string $do) use ($block, $escaper, $idField, $idValue): string {
+    return '<input type="hidden" name="form_key" value="' . $escaper->escapeHtmlAttr($block->getFormKey()) . '"/>'
+        . '<input type="hidden" name="' . $idField . '" value="' . $idValue . '"/>'
+        . '<input type="hidden" name="do" value="' . $escaper->escapeHtmlAttr($do) . '"/>';
+};
+?>
+<div class="printess-approval-detail" data-role="printess-approval-detail">
+    <p><a href="<?= $escaper->escapeUrl($block->getBackUrl()) ?>">&larr; <?= $escaper->escapeHtml($isSupervisor ? __('Back to My releasable documents') : __('Back to My Projects')) ?></a></p>
+
+    <header class="printess-approval-head">
+        <span class="printess-approval-pill tone-<?= $escaper->escapeHtmlAttr($block->getStatusTone()) ?>">
+            <?= $escaper->escapeHtml($block->getStatusLabel()) ?>
+        </span>
+        <?php if ($submission && (int) $submission->getData('round') > 1) : ?>
+            <span class="printess-approval-meta"><?= $escaper->escapeHtml(__('Round %1', (int) $submission->getData('round'))) ?></span>
+        <?php endif; ?>
+    </header>
+
+    <div class="printess-approval-grid">
+        <section class="printess-approval-preview">
+            <?php if ($status === W::STATUS_AWAITING_ACCEPTANCE && $block->getSupervisorThumbnail()) : ?>
+                <div class="printess-approval-compare">
+                    <figure>
+                        <img src="<?= $escaper->escapeUrl($project->getData('thumbnail_url')) ?>" alt=""/>
+                        <figcaption><?= $escaper->escapeHtml(__('Submitted version')) ?></figcaption>
+                    </figure>
+                    <figure>
+                        <img src="<?= $escaper->escapeUrl($block->getSupervisorThumbnail()) ?>" alt=""/>
+                        <figcaption><?= $escaper->escapeHtml(__('Supervisor\'s version')) ?></figcaption>
+                    </figure>
+                </div>
+            <?php elseif ($project->getData('thumbnail_url')) : ?>
+                <img src="<?= $escaper->escapeUrl($project->getData('thumbnail_url')) ?>"
+                     alt="<?= $escaper->escapeHtmlAttr($project->getData('name')) ?>"/>
+            <?php endif; ?>
+        </section>
+
+        <section class="printess-approval-info">
+            <dl>
+                <dt><?= $escaper->escapeHtml(__('Product')) ?></dt>
+                <dd><?= $escaper->escapeHtml($project->getData('product_name')) ?></dd>
+                <?php if ($isSupervisor) : ?>
+                    <dt><?= $escaper->escapeHtml(__('Submitted by')) ?></dt>
+                    <dd><?= $escaper->escapeHtml($block->getSubmitterLabel()) ?></dd>
+                <?php endif; ?>
+                <?php if ($submission && $submission->getData('submitted_at')) : ?>
+                    <dt><?= $escaper->escapeHtml(__('Submitted')) ?></dt>
+                    <dd><?= $escaper->escapeHtml($block->formatDateTime($submission->getData('submitted_at'))) ?></dd>
+                    <dt><?= $escaper->escapeHtml(__('Default supervisor')) ?></dt>
+                    <dd><?= $escaper->escapeHtml($block->getAssignedSupervisorLabel()) ?></dd>
+                <?php endif; ?>
+                <?php if ($submission && $submission->getData('approved_at')) : ?>
+                    <dt><?= $escaper->escapeHtml(__('Approved')) ?></dt>
+                    <dd><?= $escaper->escapeHtml(trim($block->formatDateTime($submission->getData('approved_at')) . ' · ' . $submission->getData('approved_by_name'), ' ·')) ?></dd>
+                <?php endif; ?>
+                <?php foreach ($block->getOptionsSummary() as $label => $value) : ?>
+                    <dt><?= $escaper->escapeHtml($label) ?></dt>
+                    <dd><?= $escaper->escapeHtml($value) ?></dd>
+                <?php endforeach; ?>
+            </dl>
+
+            <div class="printess-approval-actions">
+                <?php if ($isSupervisor) : ?>
+                    <?php if ($block->isLockedByOther()) : ?>
+                        <p class="message notice"><span><?= $escaper->escapeHtml(__('%1 is editing this design right now. You can act on it once they are done.', $block->getEditorName())) ?></span></p>
+                    <?php endif; ?>
+                    <div class="printess-approval-buttons">
+                        <button type="button" class="action secondary" data-approval-open="view">
+                            <span><?= $escaper->escapeHtml(__('View in editor')) ?></span>
+                        </button>
+                        <?php if ($block->isEditingByViewer()) : ?>
+                            <button type="button" class="action primary" data-approval-open="edit">
+                                <span><?= $escaper->escapeHtml(__('Continue editing')) ?></span>
+                            </button>
+                            <form method="post" action="<?= $escaper->escapeUrl($postUrl) ?>">
+                                <?= /* @noEscape */ $hidden('cancel_edit') ?>
+                                <button type="submit" class="action secondary"><span><?= $escaper->escapeHtml(__('Stop editing')) ?></span></button>
+                            </form>
+                        <?php elseif ($block->can(W::ACTION_START_EDIT)) : ?>
+                            <button type="button" class="action secondary" data-approval-open="edit">
+                                <span><?= $escaper->escapeHtml(__('Make changes myself')) ?></span>
+                            </button>
+                        <?php endif; ?>
+                    </div>
+
+                    <?php if ($block->can(W::ACTION_APPROVE)) : ?>
+                        <form method="post" action="<?= $escaper->escapeUrl($postUrl) ?>" class="printess-approval-form">
+                            <?= /* @noEscape */ $hidden('approve') ?>
+                            <label for="approve-note"><?= $escaper->escapeHtml(__('Note for the customer (optional)')) ?></label>
+                            <textarea id="approve-note" name="message" rows="2" maxlength="2000"></textarea>
+                            <button type="submit" class="action primary"><span><?= $escaper->escapeHtml(__('Approve')) ?></span></button>
+                        </form>
+                    <?php endif; ?>
+                    <?php if ($block->can(W::ACTION_REQUEST_CHANGES)) : ?>
+                        <form method="post" action="<?= $escaper->escapeUrl($postUrl) ?>" class="printess-approval-form">
+                            <?= /* @noEscape */ $hidden('request_changes') ?>
+                            <label for="changes-message"><?= $escaper->escapeHtml(__('What needs to change?')) ?></label>
+                            <textarea id="changes-message" name="message" rows="3" maxlength="2000" required></textarea>
+                            <button type="submit" class="action secondary"><span><?= $escaper->escapeHtml(__('Request changes')) ?></span></button>
+                        </form>
+                    <?php endif; ?>
+                    <?php if (in_array($status, [W::STATUS_NEEDS_REVISION, W::STATUS_AWAITING_ACCEPTANCE], true)) : ?>
+                        <p class="message info"><span><?= $escaper->escapeHtml(__('Waiting for the customer.')) ?></span></p>
+                    <?php endif; ?>
+                <?php else : ?>
+                    <?php if ($status === W::STATUS_NEEDS_REVISION) : ?>
+                        <p class="message notice"><span><?= $escaper->escapeHtml(__('A supervisor asked for changes. Edit the design and submit it again.')) ?></span></p>
+                    <?php elseif ($status === W::STATUS_SUBMITTED || $status === W::STATUS_SUPERVISOR_EDITING) : ?>
+                        <p class="message info"><span><?= $escaper->escapeHtml(__('Your design is locked while a supervisor reviews it.')) ?></span></p>
+                    <?php elseif ($status === W::STATUS_AWAITING_ACCEPTANCE) : ?>
+                        <p class="message notice"><span><?= $escaper->escapeHtml(__('A supervisor changed your design and approved it. Accept the changes to order it, or make further changes.')) ?></span></p>
+                    <?php elseif ($status === W::STATUS_APPROVED) : ?>
+                        <p class="message success"><span><?= $escaper->escapeHtml(__('Your design is approved and can be ordered.')) ?></span></p>
+                    <?php endif; ?>
+
+                    <div class="printess-approval-buttons">
+                        <?php if ($block->isOrderable()) : ?>
+                            <button type="button" class="action primary" data-approval-add-to-cart>
+                                <span><?= $escaper->escapeHtml(__('Add to cart')) ?></span>
+                            </button>
+                        <?php endif; ?>
+                        <?php if ($block->canEditDesign()) : ?>
+                            <button type="button" class="action primary" data-approval-open="project">
+                                <span><?= $escaper->escapeHtml($status === W::STATUS_NONE ? __('Edit and submit for approval') : __('Edit design')) ?></span>
+                            </button>
+                        <?php elseif ($submission) : ?>
+                            <button type="button" class="action secondary" data-approval-open="project-view">
+                                <span><?= $escaper->escapeHtml(__('View design')) ?></span>
+                            </button>
+                        <?php endif; ?>
+                        <?php if ($block->can(W::ACTION_ACCEPT)) : ?>
+                            <form method="post" action="<?= $escaper->escapeUrl($postUrl) ?>">
+                                <?= /* @noEscape */ $hidden('accept') ?>
+                                <button type="submit" class="action primary"><span><?= $escaper->escapeHtml(__('Accept changes')) ?></span></button>
+                            </form>
+                        <?php endif; ?>
+                        <?php if ($block->can(W::ACTION_REVISE)) : ?>
+                            <form method="post" action="<?= $escaper->escapeUrl($postUrl) ?>">
+                                <?= /* @noEscape */ $hidden('revise') ?>
+                                <button type="submit" class="action secondary"><span><?= $escaper->escapeHtml(__('Make changes')) ?></span></button>
+                            </form>
+                        <?php endif; ?>
+                        <?php if ($block->can(W::ACTION_RETRACT)) : ?>
+                            <form method="post" action="<?= $escaper->escapeUrl($postUrl) ?>" data-confirm="<?= $escaper->escapeHtmlAttr(__('Retract this design? It will be removed from the supervisors\' list and you can edit it again.')) ?>">
+                                <?= /* @noEscape */ $hidden('retract') ?>
+                                <button type="submit" class="action secondary"><span><?= $escaper->escapeHtml(__('Retract submission')) ?></span></button>
+                            </form>
+                        <?php endif; ?>
+                    </div>
+
+                    <?php if ($block->can(W::ACTION_SUBMIT)) : ?>
+                        <form method="post" action="<?= $escaper->escapeUrl($postUrl) ?>" class="printess-approval-form">
+                            <?= /* @noEscape */ $hidden('resubmit') ?>
+                            <label for="resubmit-message"><?= $escaper->escapeHtml(__('Message for the supervisor (optional)')) ?></label>
+                            <textarea id="resubmit-message" name="message" rows="2" maxlength="2000"></textarea>
+                            <button type="submit" class="action primary"><span><?= $escaper->escapeHtml(__('Submit again without changes')) ?></span></button>
+                        </form>
+                    <?php endif; ?>
+                    <?php if ($block->can(W::ACTION_REPLY)) : ?>
+                        <form method="post" action="<?= $escaper->escapeUrl($postUrl) ?>" class="printess-approval-form">
+                            <?= /* @noEscape */ $hidden('reply') ?>
+                            <label for="reply-message"><?= $escaper->escapeHtml(__('Reply to the supervisor')) ?></label>
+                            <textarea id="reply-message" name="message" rows="3" maxlength="2000" required></textarea>
+                            <button type="submit" class="action secondary"><span><?= $escaper->escapeHtml(__('Send reply')) ?></span></button>
+                        </form>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </div>
+        </section>
+    </div>
+
+    <?php if ($submission) : ?>
+        <section class="printess-approval-thread">
+            <h2><?= $escaper->escapeHtml(__('History and comments')) ?></h2>
+            <ol>
+                <?php foreach ($block->getEvents() as $event) : ?>
+                    <?php $type = (string) $event->getData('type'); $role = (string) $event->getData('actor_role'); ?>
+                    <li class="printess-approval-event role-<?= $escaper->escapeHtmlAttr($role) ?><?= $event->getData('message') ? ' has-message' : '' ?>">
+                        <div class="printess-approval-event-head">
+                            <strong><?= $escaper->escapeHtml($event->getData('actor_name') ?: ($role === W::ROLE_SYSTEM ? __('System') : __('Former user'))) ?></strong>
+                            <span class="printess-approval-role"><?= $escaper->escapeHtml($role === W::ROLE_SUPERVISOR ? __('Supervisor') : ($role === W::ROLE_SUBMITTER ? __('Customer') : __('System'))) ?></span>
+                            <span><?= $escaper->escapeHtml($block->getEventLabel($type)) ?></span>
+                            <time><?= $escaper->escapeHtml($block->formatDateTime($event->getData('created_at'))) ?></time>
+                        </div>
+                        <?php if ($event->getData('message')) : ?>
+                            <p class="printess-approval-message"><?= nl2br($escaper->escapeHtml($event->getData('message'))) ?></p>
+                        <?php endif; ?>
+                        <?php if ($type === W::ACTION_SAVE_EDIT && $event->getData('thumbnail_url')) : ?>
+                            <img class="printess-approval-event-thumb" src="<?= $escaper->escapeUrl($event->getData('thumbnail_url')) ?>" alt=""/>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ol>
+            <?php if ($block->can(W::ACTION_COMMENT)) : ?>
+                <form method="post" action="<?= $escaper->escapeUrl($postUrl) ?>" class="printess-approval-form">
+                    <?= /* @noEscape */ $hidden('comment') ?>
+                    <label for="comment-message"><?= $escaper->escapeHtml($isSupervisor ? __('Comment for the customer') : __('Comment for the supervisor')) ?></label>
+                    <textarea id="comment-message" name="message" rows="3" maxlength="2000" required></textarea>
+                    <button type="submit" class="action secondary"><span><?= $escaper->escapeHtml(__('Add comment')) ?></span></button>
+                </form>
+            <?php endif; ?>
+        </section>
+    <?php endif; ?>
+</div>
+<script type="text/x-magento-init">
+{
+    "[data-role=printess-approval-detail]": {
+        "Printess_PrintessEditor/js/approval-detail": <?= /* @noEscape */ json_encode($block->getJsConfig()) ?>
+    }
+}
+</script>

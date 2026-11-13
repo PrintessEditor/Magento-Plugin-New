@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Printess\PrintessEditor\Test\Unit\Model\Production;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Printess\PrintessEditor\Model\Production\ReproductionDiscountCalculator;
 
@@ -191,6 +192,7 @@ class ReproductionDiscountCalculatorTest extends TestCase
     /**
      * @dataProvider invalidRows
      */
+    #[DataProvider('invalidRows')]
     public function testInvalidInputIsRejected(array $rows, float $rate = 1.0): void
     {
         $this->expectException(\InvalidArgumentException::class);

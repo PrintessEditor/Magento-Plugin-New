@@ -147,6 +147,7 @@ No database changes; run `setup:di:compile` (production mode only) and `cache:fl
 | `printess_page_pricing` | JSON array for per-page pricing rules |
 | `printess_dropship_mode` | Dropshipping mode for this product; default empty ("No dropshipping"). See [Dropshipping → Product attributes](#product-attributes) |
 | `printess_dropship_product_definition` | Dropship product definition (dropshipper and product) used when the mode is "Use a dropship product definition" |
+| `printess_order_supervisor` | Default Order Supervisor for this product (overrides the store setting). Empty = use store default. Only used while Supervisor approval is on. See [Supervisor approval](#supervisor-approval) |
 
 ---
 
@@ -391,6 +392,80 @@ Error codes are shown on the Printess Production tab and in the order comments. 
 
 ---
 
+## Supervisor approval
+
+Some shops need a second pair of eyes before a design is printed. With **Supervisor approval** switched on,
+customers submit their designs to a Supervisor instead of adding them to the cart. Only approved designs can be
+ordered.
+
+### Setup
+
+1. **Make customers Supervisors.** Admin → Customers → All Customers → edit a customer → *Printess Supervisor* = Yes,
+   or select several customers in the grid and use the mass action *Assign Printess Supervisor role*. The grid has a
+   *Printess Supervisor* column to filter by. Supervisor status is website wide: a supervisor reviews the designs of
+   every customer of their website.
+2. **Switch it on.** Stores → Configuration → Printess Designer → Supervisor Approval (store-view scope):
+
+| Setting | Description |
+|---|---|
+| Supervisor Feedback on orders | Turns the workflow on. "Add to basket" becomes "Submit for approval"; customers must be logged in. |
+| Default Order Supervisor | Gets the email about new submissions. Must be a Supervisor of this website. Empty = all supervisors of the website are notified. A product can override it (`printess_order_supervisor`). |
+| Supervisors' Own Designs Need Approval | No (default): supervisors order their own designs directly. Yes: another supervisor must approve them. Nobody can approve their own design. |
+| Supervisor Edit Lock (minutes) | While a supervisor edits a design, others cannot act on it for this long (default 60). |
+| Notify Supervisor When a Design Is Retracted | Email the Default Order Supervisor when a customer retracts a design. |
+| Email Sender, Email Template: … | Sender identity and one template per notification (Marketing → Email Templates can override each). |
+
+3. Run `bin/magento setup:upgrade`, `setup:di:compile`, `setup:static-content:deploy`, `cache:flush` and
+   `indexer:reindex customer_grid` (for the grid column).
+
+### What customers see
+
+- On the product page (Slim UI button, or the editor's basket button in the Panel UI) they **submit the design for
+  approval**, optionally with a message. The design is saved to *My Projects* and locked: it can be viewed but not
+  changed or deleted.
+- *My Projects* shows the status of each design and an *Approval details* page with the full history and comments.
+  From there they can **retract** the submission (it becomes editable again), **comment**, **accept** or **reply to**
+  a supervisor's changes, and **add the approved design to the cart**.
+- Approved designs are added to the cart with the options chosen at submission. Designs that need approval cannot be
+  edited in the cart; any changed design must be approved again. Reordering an unchanged approved design needs no new
+  approval; *Edit & Reorder* submits the edited design for approval.
+
+### What supervisors see
+
+*My account → My releasable documents* lists every submission of their website in four tabs (To review, Waiting
+for customer, Approved, Ordered), with search. On a submission they can:
+
+- **Approve** (optional note) – the customer can order the design.
+- **Request changes** (message required) – the design is unlocked for the customer, who edits and resubmits it.
+- **Make changes myself** – opens the design in the editor (with an edit lock). *Save and approve* stores the
+  supervisor's version; the customer is asked to accept it (then it can be ordered), make further changes, or reply.
+- **Comment** at any time.
+
+### Statuses
+
+| Status (customer / supervisor label) | Meaning |
+|---|---|
+| In review / To review | Submitted, waiting for a supervisor. Locked. |
+| Being edited by a supervisor | A supervisor holds the edit lock. Locked. |
+| Changes requested | The customer has to change and resubmit the design. Editable. |
+| Supervisor made changes / Waiting for customer to accept changes | The supervisor saved and approved their own version. Locked. |
+| Approved | Can be added to the cart. Locked. |
+| Ordered | An order with this design was placed. |
+| Retracted | The customer withdrew the submission. Editable. |
+
+### Enforcement and edge cases
+
+- The check runs on the server when a design is added to the cart and again before an order is placed (onepage,
+  multishipping, REST/GraphQL). Orders created in the admin are not checked.
+- Designs in the approval process never expire and are skipped by the project reminder emails; a retracted design
+  gets the normal retention again.
+- An approved design whose Printess save token has expired cannot be added to the cart.
+- Switching the setting off keeps all submissions but lifts every lock; switching it on again restores them.
+- The admin order view (Printess Production tab) shows who approved each design, when, and whether the supervisor
+  changed it.
+
+---
+
 ## URL Endpoints
 
 | URL | Method | Description |
@@ -403,6 +478,15 @@ Error codes are shown on the Printess Production tab and in the order comments. 
 | `/printess/production/callback` | POST | Printess "rendering finished" callback (only used in callback mode) |
 | `/printess/dropship/callback?order=<order id>` | POST | Printess dropship tracking callback, one nonce per item (callback type 3; only used in callback mode) |
 | `/printess/dropship/callback?n=<nonce>` | POST | Old dropship callback, only for items sent before the upgrade to dropship groups |
+| `/printess/approval/submit` | POST | Save a design as a project and submit it for supervisor approval |
+| `/printess/approval/act` | POST | Submitter actions: resubmit, retract, accept, revise, reply, comment |
+| `/printess/approval/project?id=<project id>` | GET | Approval details of the customer's own design |
+| `/printess/approval/addToCart` | POST | Add an approved design to the cart |
+| `/printess/approval/index` | GET | My releasable documents (supervisors only) |
+| `/printess/approval/view?id=<submission id>` | GET | One submission as a supervisor sees it |
+| `/printess/approval/review` | POST | Supervisor actions: approve, request_changes, comment, cancel_edit |
+| `/printess/approval/startEdit` | POST | Open a submission in the editor (view, or edit with lock) |
+| `/printess/approval/saveEdit` | POST | Save the supervisor's version and mark it approved |
 
 ---
 

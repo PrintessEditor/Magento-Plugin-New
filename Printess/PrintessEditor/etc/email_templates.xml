@@ -9,4 +9,36 @@
               label="Printess Project - Removal Reminder"
               file="printess_project_remind_of_removal.html" type="html"
               module="Printess_PrintessEditor" area="frontend"/>
+    <template id="printess_designer_supervisor_approval_template_submitted"
+              label="Printess Approval - Submitted"
+              file="printess_approval_submitted.html" type="html"
+              module="Printess_PrintessEditor" area="frontend"/>
+    <template id="printess_designer_supervisor_approval_template_changes_requested"
+              label="Printess Approval - Changes requested"
+              file="printess_approval_changes_requested.html" type="html"
+              module="Printess_PrintessEditor" area="frontend"/>
+    <template id="printess_designer_supervisor_approval_template_supervisor_changed"
+              label="Printess Approval - Supervisor changed"
+              file="printess_approval_supervisor_changed.html" type="html"
+              module="Printess_PrintessEditor" area="frontend"/>
+    <template id="printess_designer_supervisor_approval_template_approved"
+              label="Printess Approval - Approved"
+              file="printess_approval_approved.html" type="html"
+              module="Printess_PrintessEditor" area="frontend"/>
+    <template id="printess_designer_supervisor_approval_template_accepted"
+              label="Printess Approval - Accepted"
+              file="printess_approval_accepted.html" type="html"
+              module="Printess_PrintessEditor" area="frontend"/>
+    <template id="printess_designer_supervisor_approval_template_replied"
+              label="Printess Approval - Replied"
+              file="printess_approval_replied.html" type="html"
+              module="Printess_PrintessEditor" area="frontend"/>
+    <template id="printess_designer_supervisor_approval_template_retracted"
+              label="Printess Approval - Retracted"
+              file="printess_approval_retracted.html" type="html"
+              module="Printess_PrintessEditor" area="frontend"/>
+    <template id="printess_designer_supervisor_approval_template_comment"
+              label="Printess Approval - Comment"
+              file="printess_approval_comment.html" type="html"
+              module="Printess_PrintessEditor" area="frontend"/>
 </config>

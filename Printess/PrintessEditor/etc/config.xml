@@ -19,6 +19,21 @@
                 <order_reminder_template>printess_designer_projects_order_reminder_template</order_reminder_template>
                 <removal_reminder_template>printess_designer_projects_removal_reminder_template</removal_reminder_template>
             </projects>
+            <supervisor_approval>
+                <enabled>0</enabled>
+                <supervisors_need_approval>0</supervisors_need_approval>
+                <edit_lock_minutes>60</edit_lock_minutes>
+                <notify_on_retract>1</notify_on_retract>
+                <email_identity>general</email_identity>
+                <template_submitted>printess_designer_supervisor_approval_template_submitted</template_submitted>
+                <template_changes_requested>printess_designer_supervisor_approval_template_changes_requested</template_changes_requested>
+                <template_supervisor_changed>printess_designer_supervisor_approval_template_supervisor_changed</template_supervisor_changed>
+                <template_approved>printess_designer_supervisor_approval_template_approved</template_approved>
+                <template_accepted>printess_designer_supervisor_approval_template_accepted</template_accepted>
+                <template_replied>printess_designer_supervisor_approval_template_replied</template_replied>
+                <template_retracted>printess_designer_supervisor_approval_template_retracted</template_retracted>
+                <template_comment>printess_designer_supervisor_approval_template_comment</template_comment>
+            </supervisor_approval>
             <cron>
                 <send_project_reminders>30 8 * * *</send_project_reminders>
                 <remove_expired_projects>30 2 * * *</remove_expired_projects>

@@ -94,5 +94,75 @@
         "column": {
             "printess_reproduction_of": true
         }
+    },
+    "printess_approval_submission": {
+        "column": {
+            "submission_id": true,
+            "project_id": true,
+            "customer_id": true,
+            "store_id": true,
+            "website_id": true,
+            "product_id": true,
+            "status": true,
+            "round": true,
+            "submitted_save_token": true,
+            "supervisor_save_token": true,
+            "supervisor_thumbnail_url": true,
+            "approved_save_token": true,
+            "buy_request_json": true,
+            "assigned_supervisor_id": true,
+            "editing_supervisor_id": true,
+            "edit_lock_expires_at": true,
+            "last_supervisor_id": true,
+            "approved_by": true,
+            "approved_by_name": true,
+            "supervisor_edited": true,
+            "submitted_at": true,
+            "approved_at": true,
+            "ordered_at": true,
+            "order_id": true,
+            "version": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "index": {
+            "PRINTESS_APPROVAL_SUBMISSION_WEBSITE_ID_STATUS": true,
+            "PRINTESS_APPROVAL_SUBMISSION_CUSTOMER_ID_STATUS": true,
+            "PRINTESS_APPROVAL_SUBMISSION_APPROVED_SAVE_TOKEN": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "PRINTESS_APPROVAL_SUBMISSION_PROJECT_ID": true,
+            "PRINTESS_APPROVAL_SUBM_PROJECT_ID_PRINTESS_PROJECTS_PROJECT_ID": true,
+            "PRINTESS_APPROVAL_SUBM_CUSTOMER_ID_CUSTOMER_ENTITY_ENTITY_ID": true,
+            "PRINTESS_APPROVAL_SUBM_ASSIGNED_SPV_ID_CUSTOMER_ENTITY_ENTITY_ID": true,
+            "PRINTESS_APPROVAL_SUBM_EDITING_SPV_ID_CUSTOMER_ENTITY_ENTITY_ID": true,
+            "PRINTESS_APPROVAL_SUBM_LAST_SPV_ID_CUSTOMER_ENTITY_ENTITY_ID": true,
+            "PRINTESS_APPROVAL_SUBM_APPROVED_BY_CUSTOMER_ENTITY_ENTITY_ID": true
+        }
+    },
+    "printess_approval_event": {
+        "column": {
+            "event_id": true,
+            "submission_id": true,
+            "actor_customer_id": true,
+            "actor_name": true,
+            "actor_role": true,
+            "type": true,
+            "status_after": true,
+            "message": true,
+            "save_token": true,
+            "thumbnail_url": true,
+            "created_at": true
+        },
+        "index": {
+            "PRINTESS_APPROVAL_EVENT_SUBMISSION_ID_CREATED_AT": true,
+            "PRINTESS_APPROVAL_EVENT_SAVE_TOKEN": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "PRINTESS_APPROVAL_EVENT_SUBM_ID_PRINTESS_APPROVAL_SUBM_SUBM_ID": true,
+            "PRINTESS_APPROVAL_EVENT_ACTOR_ID_CUSTOMER_ENTITY_ENTITY_ID": true
+        }
     }
 }

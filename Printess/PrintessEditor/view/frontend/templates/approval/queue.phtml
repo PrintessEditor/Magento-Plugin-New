@@ -1,0 +1,99 @@
+<?php
+/**
+ * SUP-09: My releasable documents.
+ *
+ * @var \Printess\PrintessEditor\Block\Approval\Queue $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+$items = $block->getCollection();
+$current = $block->getTab();
+?>
+<div class="printess-approval-queue">
+    <nav class="printess-approval-tabs" aria-label="<?= $escaper->escapeHtmlAttr(__('Filter by status')) ?>">
+        <?php foreach ($block->getTabLabels() as $tab => $label) : ?>
+            <?php $count = $block->getTabCount($tab); ?>
+            <a href="<?= $escaper->escapeUrl($block->getTabUrl($tab)) ?>"
+               class="printess-approval-tab<?= $tab === $current ? ' active' : '' ?>"
+               <?= $tab === $current ? 'aria-current="page"' : '' ?>>
+                <?= $escaper->escapeHtml($label) ?>
+                <span class="printess-approval-count"><?= (int) $count ?></span>
+            </a>
+        <?php endforeach; ?>
+    </nav>
+
+    <form class="printess-approval-search" method="get" action="<?= $escaper->escapeUrl($block->getUrl('printess/approval/index')) ?>">
+        <input type="hidden" name="tab" value="<?= $escaper->escapeHtmlAttr($current) ?>"/>
+        <label for="printess-approval-q" class="printess-sr-only"><?= $escaper->escapeHtml(__('Search')) ?></label>
+        <input id="printess-approval-q" class="input-text" type="search" name="q"
+               value="<?= $escaper->escapeHtmlAttr($block->getSearch()) ?>"
+               placeholder="<?= $escaper->escapeHtmlAttr(__('Search by customer or design name')) ?>"/>
+        <button class="action secondary" type="submit"><span><?= $escaper->escapeHtml(__('Search')) ?></span></button>
+    </form>
+
+    <?php if ($items->getSize()) : ?>
+        <div class="printess-projects">
+            <?php foreach ($items as $item) : ?>
+                <?php
+                $id = (int) $item->getId();
+                $submitter = trim($item->getData('submitter_firstname') . ' ' . $item->getData('submitter_lastname'));
+                $assigned = trim($item->getData('assigned_firstname') . ' ' . $item->getData('assigned_lastname'));
+                $editing = trim($item->getData('editing_firstname') . ' ' . $item->getData('editing_lastname'));
+                $last = $block->getLastMessage($id);
+                ?>
+                <article class="printess-project printess-approval-item" data-submission-id="<?= $id ?>">
+                    <?php if ($item->getData('thumbnail_url')) : ?>
+                        <div class="printess-project-image">
+                            <a href="<?= $escaper->escapeUrl($block->getViewUrl($id)) ?>">
+                                <img src="<?= $escaper->escapeUrl($item->getData('thumbnail_url')) ?>"
+                                     alt="<?= $escaper->escapeHtmlAttr($item->getData('project_name')) ?>"/>
+                            </a>
+                        </div>
+                    <?php endif; ?>
+                    <div class="printess-project-details">
+                        <p class="printess-project-title">
+                            <strong>
+                                <a href="<?= $escaper->escapeUrl($block->getViewUrl($id)) ?>">
+                                    <?= $escaper->escapeHtml($item->getData('project_name')) ?>
+                                </a>
+                            </strong>
+                            <span class="printess-approval-pill tone-<?= $escaper->escapeHtmlAttr($block->getStatusTone($item->getStatus())) ?>">
+                                <?= $escaper->escapeHtml($block->getStatusLabel($item->getStatus())) ?>
+                            </span>
+                        </p>
+                        <p><?= $escaper->escapeHtml($item->getData('product_name')) ?></p>
+                        <p>
+                            <?= $escaper->escapeHtml(__('Submitted by %1 (%2)', $submitter, $item->getData('submitter_email'))) ?>
+                            · <?= $escaper->escapeHtml($block->formatDateTime($item->getData('submitted_at'))) ?>
+                            <?php if ((int) $item->getData('round') > 1) : ?>
+                                · <?= $escaper->escapeHtml(__('Round %1', (int) $item->getData('round'))) ?>
+                            <?php endif; ?>
+                        </p>
+                        <p><?= $escaper->escapeHtml(__('Default supervisor: %1', $assigned !== '' ? $assigned : __('All supervisors'))) ?></p>
+                        <?php if ($editing !== '') : ?>
+                            <p class="printess-approval-lock">
+                                <?= $escaper->escapeHtml(__('%1 is editing this design', $editing)) ?>
+                            </p>
+                        <?php endif; ?>
+                        <?php if ($last !== '') : ?>
+                            <blockquote class="printess-approval-excerpt"><?= $escaper->escapeHtml($last) ?></blockquote>
+                        <?php endif; ?>
+                        <div class="printess-project-actions">
+                            <a class="action primary" href="<?= $escaper->escapeUrl($block->getViewUrl($id)) ?>">
+                                <span><?= $escaper->escapeHtml($current === 'review' ? __('Review') : __('Open')) ?></span>
+                            </a>
+                        </div>
+                    </div>
+                </article>
+            <?php endforeach; ?>
+        </div>
+        <?= $block->getPagerHtml() ?>
+    <?php else : ?>
+        <div class="message info empty">
+            <span>
+                <?= $escaper->escapeHtml($current === 'review'
+                    ? __('There are no designs waiting for your review.')
+                    : __('Nothing here yet.')) ?>
+            </span>
+        </div>
+    <?php endif; ?>
+</div>

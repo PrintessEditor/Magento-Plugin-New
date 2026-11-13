@@ -1,0 +1,81 @@
+/* Supervisor approval (SUP-08/09): status pills, queue tabs, detail page and thread. */
+.printess-approval-pill {
+    border-radius: 999px;
+    display: inline-block;
+    font-size: 1.2rem;
+    font-weight: 600;
+    letter-spacing: .02em;
+    line-height: 1.6;
+    padding: 0 10px;
+    white-space: nowrap;
+}
+.printess-approval-pill.tone-review { background: #e8eefc; color: #1d3f9e; }
+.printess-approval-pill.tone-action { background: #fff1d6; color: #8a4b00; }
+.printess-approval-pill.tone-ok { background: #e1f4e8; color: #17663a; }
+.printess-approval-pill.tone-neutral { background: #eee; color: #444; }
+
+.printess-approval-status { align-items: center; display: flex; gap: 10px; flex-wrap: wrap; }
+.printess-approval-status strong { color: #8a4b00; font-size: 1.3rem; }
+
+.printess-approval-tabs { border-bottom: 1px solid #ccc; display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 16px; }
+.printess-approval-tab {
+    border-bottom: 3px solid transparent;
+    color: #333;
+    padding: 8px 14px;
+    text-decoration: none;
+}
+.printess-approval-tab:hover { text-decoration: none; background: #f5f5f5; }
+.printess-approval-tab.active { border-bottom-color: #1979c3; font-weight: 600; }
+.printess-approval-count {
+    background: #eee;
+    border-radius: 999px;
+    font-size: 1.2rem;
+    margin-left: 4px;
+    padding: 0 7px;
+}
+.printess-approval-search { display: flex; gap: 8px; margin-bottom: 8px; max-width: 520px; }
+.printess-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.printess-approval-lock { color: #8a4b00 !important; font-weight: 600; }
+.printess-approval-excerpt {
+    border-left: 3px solid #ccc;
+    color: #555;
+    font-style: italic;
+    margin: 8px 0 0;
+    padding: 2px 0 2px 10px;
+}
+
+.printess-approval-head { align-items: center; display: flex; gap: 12px; margin-bottom: 16px; }
+.printess-approval-meta { color: #666; }
+.printess-approval-grid { display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
+@media (max-width: 767px) { .printess-approval-grid { grid-template-columns: minmax(0, 1fr); } }
+.printess-approval-preview img { border: 1px solid #ddd; display: block; height: auto; max-width: 100%; }
+.printess-approval-compare { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+.printess-approval-compare figure { margin: 0; }
+.printess-approval-compare figcaption { color: #555; font-size: 1.3rem; margin-top: 4px; text-align: center; }
+.printess-approval-info dl { display: grid; gap: 4px 16px; grid-template-columns: max-content minmax(0, 1fr); margin: 0 0 16px; }
+.printess-approval-info dt { color: #666; font-weight: 400; margin: 0; }
+.printess-approval-info dd { margin: 0; overflow-wrap: anywhere; }
+.printess-approval-buttons { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.printess-approval-buttons form { margin: 0; }
+.printess-approval-form { border-top: 1px solid #eee; display: grid; gap: 6px; margin-top: 12px; padding-top: 12px; }
+.printess-approval-form label { font-weight: 600; }
+.printess-approval-form textarea { box-sizing: border-box; width: 100%; }
+.printess-approval-form .action { justify-self: start; }
+
+.printess-approval-thread { margin-top: 32px; }
+.printess-approval-thread ol { list-style: none; margin: 0 0 16px; padding: 0; }
+.printess-approval-event { border-left: 3px solid #ddd; margin: 0 0 12px; padding: 4px 0 4px 12px; }
+.printess-approval-event.role-supervisor { border-left-color: #1979c3; }
+.printess-approval-event.role-submitter { border-left-color: #8a8a8a; }
+.printess-approval-event.role-system { border-left-color: #eee; color: #777; }
+.printess-approval-event-head { align-items: baseline; display: flex; flex-wrap: wrap; gap: 8px; }
+.printess-approval-event-head time { color: #777; font-size: 1.2rem; }
+.printess-approval-role { background: #f1f1f1; border-radius: 3px; font-size: 1.1rem; padding: 0 6px; text-transform: uppercase; }
+.printess-approval-message { background: #fafafa; border-radius: 4px; margin: 6px 0 0; padding: 8px 10px; white-space: normal; }
+.printess-approval-event-thumb { display: block; margin-top: 6px; max-width: 160px; }
+
+/* Pager outside a Luma .toolbar: keep "N Items" and the limiter apart (SUP-B03). */
+.printess-approval-queue .pager { align-items: center; display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 16px; }
+.printess-approval-queue .pager .toolbar-amount { margin: 0; padding: 0; }
+.printess-approval-queue .pager .limiter { align-items: center; display: flex; gap: 6px; margin: 0; }
+.printess-approval-queue .pager .limiter .label { margin: 0; }

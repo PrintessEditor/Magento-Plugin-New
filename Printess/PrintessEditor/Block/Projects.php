@@ -22,6 +22,10 @@ class Projects extends Template
         CollectionFactory $collectionFactory,
         Session $customerSession,
         private readonly DateTime $dateTime,
+        private readonly \Printess\PrintessEditor\Model\Approval\SubmissionRepository $submissionRepository,
+        private readonly \Printess\PrintessEditor\Model\Approval\StatusLabels $statusLabels,
+        private readonly \Printess\PrintessEditor\Model\Approval\Workflow $approvalWorkflow,
+        private readonly \Printess\PrintessEditor\Model\Approval\ApprovalConfig $approvalConfig,
         array $data = []
     ) {
         parent::__construct($context, $data);
@@ -86,5 +90,45 @@ class Projects extends Template
         } catch (\Throwable) {
             return true;
         }
+    }
+
+    /** @var array<int,\Printess\PrintessEditor\Model\Approval\Submission>|null */
+    private ?array $submissions = null;
+
+    public function getSubmission(Project $project): ?\Printess\PrintessEditor\Model\Approval\Submission
+    {
+        if (!$this->approvalConfig->isEnabled()) {
+            return null; // feature off: no locks, no status (data is kept)
+        }
+        if ($this->submissions === null) {
+            $ids = array_map('intval', $this->projects->getColumnValues('project_id'));
+            $this->submissions = $this->submissionRepository->getByProjectIds($ids);
+        }
+        return $this->submissions[(int) $project->getId()] ?? null;
+    }
+
+    public function getApprovalStatusLabel(string $status): string
+    {
+        return $this->statusLabels->status($status);
+    }
+
+    public function getApprovalTone(string $status): string
+    {
+        return $this->statusLabels->tone($status);
+    }
+
+    public function isApprovalLocked(string $status): bool
+    {
+        return $this->approvalWorkflow->isLocked($status);
+    }
+
+    public function needsSubmitterAction(string $status): bool
+    {
+        return $this->approvalWorkflow->needsSubmitterAction($status);
+    }
+
+    public function getApprovalUrl(Project $project): string
+    {
+        return $this->getUrl('printess/approval/project', ['id' => (int) $project->getId()]);
     }
 }
