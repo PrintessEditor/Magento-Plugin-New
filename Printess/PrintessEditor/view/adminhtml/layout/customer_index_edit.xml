@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<!-- RMC-02: "Printess" tab on the customer edit page (RM_CUST per store view). -->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceBlock name="customer_form">
+            <block class="Printess\PrintessEditor\Block\Adminhtml\Customer\Edit\Tab\PrintessFields"
+                   name="printess_customer_edit_tab_fields"/>
+        </referenceBlock>
+    </body>
+</page>

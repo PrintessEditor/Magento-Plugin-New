@@ -1,0 +1,75 @@
+<style>
+.pud-status{font-size:12px;color:#888;margin-bottom:6px}
+.pud-err{font-size:12px;color:#c00;margin-bottom:6px}
+.pud-table{width:100%;border-collapse:collapse;margin-bottom:8px}
+.pud-table th{font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:4px 8px 4px 0}
+.pud-table td{padding:4px 8px 4px 0;vertical-align:middle;border-top:1px solid #eee}
+.pud-name small{display:block;color:#888;font-size:11px}
+.pud-missing{font-size:12px;background:#fff3cd;border:1px solid #f0c040;color:#856404;padding:2px 6px;border-radius:3px;display:inline-block;margin-top:2px}
+.pud-del{padding:3px 9px;background:#f0f0f0;border:1px solid #bbb;border-radius:3px;cursor:pointer}
+</style>
+
+<!-- ko ifnot: hasTemplate() -->
+<div class="pud-status">Select a Printess template first; its form fields are listed here.</div>
+<!-- /ko -->
+<!-- ko if: loadingFields() -->
+<div class="pud-status">Loading form fields from Printess&hellip;</div>
+<!-- /ko -->
+<!-- ko if: !loadingFields() && fieldsError() -->
+<div class="pud-err" data-bind="text: fieldsError() + ' You can still enter field names by hand.'"></div>
+<!-- /ko -->
+<!-- ko if: !loadingFields() && baseTemplate() -->
+<div class="pud-status" data-bind="text: 'Includes form fields of base template “' + baseTemplate() + '”.'"></div>
+<!-- /ko -->
+<!-- ko if: fieldsLoaded() && !rows().length -->
+<div class="pud-status">This template has no form fields.</div>
+<!-- /ko -->
+
+<!-- ko if: rows().length -->
+<table class="pud-table">
+    <thead><tr><th>Form field</th><th>Fill with</th><th></th></tr></thead>
+    <tbody data-bind="foreach: rows">
+    <tr data-bind="attr: {'data-printess-field': fieldName}">
+        <td class="pud-name">
+            <span data-bind="text: label"></span>
+            <!-- ko if: label !== fieldName --><small data-bind="text: fieldName"></small><!-- /ko -->
+            <!-- ko if: missing -->
+            <span class="pud-missing">Not found in the current template</span>
+            <!-- /ko -->
+        </td>
+        <td>
+            <select class="admin__control-select"
+                    data-bind="value: source,
+                               disable: $parent.disabled(),
+                               options: $parent.sourceOptions,
+                               optionsValue: 'value',
+                               optionsText: 'label'"></select>
+        </td>
+        <td>
+            <!-- ko if: (missing || !$parent.fieldsLoaded()) && !$parent.disabled() -->
+            <button type="button" class="pud-del" title="Remove"
+                    data-bind="click: function () { $parent.removeRow($data); }">&times;</button>
+            <!-- /ko -->
+        </td>
+    </tr>
+    </tbody>
+</table>
+<!-- /ko -->
+
+<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px">
+    <!-- ko ifnot: fieldsLoaded() -->
+    <input type="text" class="admin__control-text" style="max-width:260px"
+           placeholder="Form field name"
+           data-bind="value: manualName, valueUpdate: 'input', disable: disabled(),
+                      event: {keydown: function (d, e) { if (e.key === 'Enter') { addManual(); return false; } return true; }}"/>
+    <button type="button" class="action-secondary scalable" data-bind="click: addManual, disable: disabled()">
+        <span>Add Form Field</span>
+    </button>
+    <!-- /ko -->
+    <!-- ko if: hasTemplate() -->
+    <button type="button" class="action-secondary scalable" data-bind="click: reload, disable: loadingFields()">
+        <span data-bind="text: loadingFields() ? 'Loading…' : 'Reload Form Fields'"></span>
+    </button>
+    <!-- /ko -->
+    <span class="pud-status" style="margin:0" data-bind="text: mappedCount() + ' field(s) prefilled'"></span>
+</div>

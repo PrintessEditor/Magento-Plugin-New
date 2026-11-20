@@ -117,6 +117,12 @@ try {
 ?>
 
 <?php if ($_product->isSaleable()) : ?>
+<?php if ($_isSlimUi || $_isPrintess) : ?>
+<script>
+    // RMC-B01: the store view this (cached) page was rendered for; sent with printess/customer/fields.
+    window.printessStoreCode = <?= /* @noEscape */ json_encode((string) $_store->getCode()) ?>;
+</script>
+<?php endif; ?>
 
 <?php if ($_isSlimUi) : ?>
 <!-- ── Printess Slim UI ──────────────────────────────────────────── -->
@@ -182,6 +188,7 @@ require(['Printess_PrintessEditor/js/printess-integration'], function (PrintessE
         slimLoaderUrl:       <?= /* @noEscape */ json_encode($_slimLoaderUrl) ?>,
         panelLoaderUrl:      <?= /* @noEscape */ json_encode($_panelLoaderUrl) ?>,
         templateName:        <?= /* @noEscape */ json_encode($_template) ?>,
+        productId:           <?= /* @noEscape */ json_encode((string)$_product->getId()) ?>,
         formId:              'product_addtocart_form',
         variantOptions:      <?= /* @noEscape */ json_encode($_variantOptions) ?>,
         customOptions:       <?= /* @noEscape */ json_encode($_customOptions) ?>,

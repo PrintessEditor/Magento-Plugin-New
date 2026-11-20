@@ -1,0 +1,102 @@
+<?php
+/**
+ * RMC-02: Printess form field values (RM_CUST) of this customer per store view.
+ *
+ * @var \Printess\PrintessEditor\Block\Adminhtml\Customer\Edit\Tab\PrintessFields $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+$fields = $block->getFields();
+$rows = $block->getRows();
+$uid = 'printess-fields-' . $block->getCustomerId();
+?>
+<div class="fieldset-wrapper printess-customer-fields" id="<?= $escaper->escapeHtmlAttr($uid) ?>">
+    <div class="fieldset-wrapper-title">
+        <span class="title"><?= $escaper->escapeHtml(__('Printess form fields per store view')) ?></span>
+    </div>
+    <p class="note" style="margin:0 0 16px;">
+        <?= $escaper->escapeHtml(__('Filled into the hidden Printess form field of the same name whenever this customer starts a new design in the store view. Leave empty for no value. Saved designs keep the value they were created with.')) ?>
+    </p>
+    <?php if (!$rows) : ?>
+        <div class="message message-notice"><?= $escaper->escapeHtml(__('This customer cannot log into any store view.')) ?></div>
+    <?php else : ?>
+        <table class="data-grid" style="max-width:900px;">
+            <thead>
+            <tr>
+                <th class="data-grid-th"><?= $escaper->escapeHtml(__('Website')) ?></th>
+                <th class="data-grid-th"><?= $escaper->escapeHtml(__('Store View')) ?></th>
+                <?php foreach ($fields as $field) : ?>
+                    <th class="data-grid-th"><?= $escaper->escapeHtml($field) ?></th>
+                <?php endforeach; ?>
+            </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($rows as $row) : ?>
+                <?php foreach ($row['stores'] as $i => $store) : ?>
+                    <tr>
+                        <td><?= $i === 0 ? $escaper->escapeHtml($row['website']) : '' ?></td>
+                        <td>
+                            <label for="<?= $escaper->escapeHtmlAttr($uid . '-' . $store['id']) ?>">
+                                <?= $escaper->escapeHtml($store['name']) ?>
+                                <span style="color:#777">(<?= $escaper->escapeHtml($store['code']) ?>)</span>
+                            </label>
+                        </td>
+                        <?php foreach ($fields as $field) : ?>
+                            <td>
+                                <!-- no name attribute: never sent with the customer form itself -->
+                                <input type="text" class="admin__control-text"
+                                       id="<?= $escaper->escapeHtmlAttr($uid . '-' . $store['id']) ?>"
+                                       data-printess-store="<?= (int) $store['id'] ?>"
+                                       data-printess-field="<?= $escaper->escapeHtmlAttr($field) ?>"
+                                       maxlength="<?= (int) $block->getMaxLength() ?>"
+                                       value="<?= $escaper->escapeHtmlAttr($store['values'][$field] ?? '') ?>"/>
+                            </td>
+                        <?php endforeach; ?>
+                    </tr>
+                <?php endforeach; ?>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        <div style="margin-top:16px;display:flex;gap:12px;align-items:center;">
+            <button type="button" class="action-secondary" data-printess-fields-save>
+                <span><?= $escaper->escapeHtml(__('Save Printess fields')) ?></span>
+            </button>
+            <span data-printess-fields-status role="status"></span>
+        </div>
+        <script>
+        require(['jquery'], function ($) {
+            var root = document.getElementById(<?= /* @noEscape */ json_encode($uid) ?>);
+            var status = root.querySelector('[data-printess-fields-status]');
+            root.addEventListener('keydown', function (e) {
+                // Enter must not submit the customer form
+                if (e.key === 'Enter' && e.target.matches('input[data-printess-field]')) { e.preventDefault(); }
+            });
+            root.querySelector('[data-printess-fields-save]').addEventListener('click', function () {
+                var values = {};
+                root.querySelectorAll('input[data-printess-field]').forEach(function (input) {
+                    var field = input.getAttribute('data-printess-field');
+                    values[field] = values[field] || {};
+                    values[field][input.getAttribute('data-printess-store')] = input.value;
+                });
+                status.textContent = <?= /* @noEscape */ json_encode((string) __('Saving…')) ?>;
+                status.style.color = '';
+                $.ajax({
+                    url: <?= /* @noEscape */ json_encode($block->getSaveUrl()) ?>,
+                    type: 'POST',
+                    dataType: 'json',
+                    data: {
+                        form_key: window.FORM_KEY,
+                        customer_id: <?= (int) $block->getCustomerId() ?>,
+                        values: JSON.stringify(values)
+                    }
+                }).done(function (r) {
+                    status.textContent = (r && r.message) || '';
+                    status.style.color = r && r.success ? '#185b00' : '#e22626';
+                }).fail(function () {
+                    status.textContent = <?= /* @noEscape */ json_encode((string) __('The values could not be saved. Please try again.')) ?>;
+                    status.style.color = '#e22626';
+                });
+            });
+        });
+        </script>
+    <?php endif; ?>
+</div>

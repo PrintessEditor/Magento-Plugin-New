@@ -164,5 +164,21 @@
             "PRINTESS_APPROVAL_EVENT_SUBM_ID_PRINTESS_APPROVAL_SUBM_SUBM_ID": true,
             "PRINTESS_APPROVAL_EVENT_ACTOR_ID_CUSTOMER_ENTITY_ENTITY_ID": true
         }
+    },
+    "printess_customer_form_field": {
+        "column": {
+            "entity_id": true,
+            "customer_id": true,
+            "store_id": true,
+            "field_name": true,
+            "value": true,
+            "updated_at": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "PRINTESS_CUSTOMER_FORM_FIELD_CUSTOMER_STORE_FIELD": true,
+            "PRINTESS_CUST_FORM_FIELD_CUSTOMER_ID_CUSTOMER_ENTITY_ENTITY_ID": true,
+            "PRINTESS_CUST_FORM_FIELD_STORE_ID_STORE_STORE_ID": true
+        }
     }
 }

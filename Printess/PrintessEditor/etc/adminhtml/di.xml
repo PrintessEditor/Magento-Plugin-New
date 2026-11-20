@@ -28,6 +28,10 @@
                     <item name="class" xsi:type="string">Printess\PrintessEditor\Ui\DataProvider\Product\Form\Modifier\PrintessFormFieldsModifier</item>
                     <item name="sortOrder" xsi:type="number">220</item>
                 </item>
+                <item name="printess_user_data_map_modifier" xsi:type="array">
+                    <item name="class" xsi:type="string">Printess\PrintessEditor\Ui\DataProvider\Product\Form\Modifier\PrintessUserDataMapModifier</item>
+                    <item name="sortOrder" xsi:type="number">225</item>
+                </item>
             </argument>
         </arguments>
     </virtualType>

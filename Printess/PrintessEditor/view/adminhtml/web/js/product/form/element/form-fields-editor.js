@@ -84,6 +84,13 @@ define([
                 this._initRows(initial);
             }
 
+            // PFF-B01: on a store view with "Use Default Value" ticked, edits are discarded on save (the backend stores
+            // null). The rows stay editable, so warn as soon as the admin changes something in that state.
+            this.editedWhileDefault = ko.observable(false);
+            this.showDefaultWarning = ko.computed(function () {
+                return this.editedWhileDefault() && this._usesDefault();
+            }, this);
+
             // Keep value in sync with rows
             var self = this;
             ko.computed(function () {
@@ -245,11 +252,36 @@ define([
             });
         },
 
+        _usesDefault: function () {
+            return typeof this.isUseDefault === 'function' && !!this.isUseDefault();
+        },
+
+        /**
+         * Called from the row inputs (with their DOM event) and the add/remove buttons; returns true so the browser's
+         * default action runs. Only real user input counts: Knockout's options binding fires synthetic change events
+         * (via jQuery) while the field list loads.
+         */
+        markEdited: function (event) {
+            if (event) {
+                // KO triggers through jQuery when it is loaded: the jQuery event has no isTrusted of its own.
+                var native = event.originalEvent || event;
+                if (native.isTrusted !== true) {
+                    return true;
+                }
+            }
+            if (this._usesDefault()) {
+                this.editedWhileDefault(true);
+            }
+            return true;
+        },
+
         addRow: function () {
+            this.markEdited();
             this.rows.push(this._makeRow('', ''));
         },
 
         removeRow: function (index) {
+            this.markEdited();
             this.rows.splice(index, 1);
         }
     });

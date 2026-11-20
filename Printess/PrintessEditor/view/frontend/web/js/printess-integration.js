@@ -811,9 +811,66 @@ define(['jquery', 'mage/url', 'mage/translate'], function ($, mageUrl, $t) {
         return !opts.restoreSavedDesign && opts.mergeTemplates && opts.mergeTemplates.length ? opts.mergeTemplates : [];
     }
 
+
+    // --- customer form fields per store view (RMC-04), e.g. RM_CUST ---
+    var _customerFieldsPromises = {};
+
+    /** Admin-set form field values of the logged-in customer in this store view ([] for guests / on errors). */
+    /**
+     * RMC-04 / UDP-04: the customer's own form field values (RM_CUST of this store view, plus the account data the
+     * product maps with "Prefill user data"). One request per product and page; guests get [].
+     * The store code is sent along so a page opened with ?___store=… gets that store's values (RMC-B01).
+     */
+    function getCustomerFormFields(productId) {
+        var key = String(productId || '');
+        if (!_customerFieldsPromises[key]) {
+            var params = [];
+            if (key) params.push('product=' + encodeURIComponent(key));
+            if (window.printessStoreCode) params.push('___store=' + encodeURIComponent(window.printessStoreCode));
+            // window.BASE_URL (set inline in <head>), not mageUrl.build(): the Slim UI starts before mage/url has its
+            // base URL, and a relative URL resolves against the product page path (UDP-B01).
+            var base = window.BASE_URL || '/';
+            _customerFieldsPromises[key] = fetch(base + 'printess/customer/fields' + (params.length ? '?' + params.join('&') : ''), {
+                credentials: 'same-origin',
+                cache: 'no-store',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            }).then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            }).then(function (data) {
+                return (data && data.formFields) || [];
+            }).catch(function () {
+                delete _customerFieldsPromises[key]; // retry on the next editor open
+                return [];
+            });
+        }
+        return _customerFieldsPromises[key];
+    }
+
+    /** Customer values win over predefined / variant-derived fields (only used for NEW designs). */
+    function mergeCustomerFormFields(formFields, customerFields) {
+        var map = {};
+        var order = [];
+        (formFields || []).forEach(function (ff) {
+            if (!ff || !ff.name) return;
+            if (!(ff.name in map)) order.push(ff.name);
+            map[ff.name] = ff.value;
+        });
+        (customerFields || []).forEach(function (ff) {
+            if (!ff || !ff.name || ff.value === '' || ff.value === null || ff.value === undefined) return;
+            if (!(ff.name in map)) order.push(ff.name);
+            map[ff.name] = ff.value;
+        });
+        return order.map(function (name) { return { name: name, value: map[name] }; });
+    }
+
     async function openPanelEditor(opts) {
         var formFields = opts.restoreSavedDesign ? (opts.formFields || []) :
             withPhotobookTheme(opts.formFields, opts.magicPhotobookTheme);
+        // RMC-04: a new design gets the customer's RM_CUST (etc.) for this store; saved designs keep theirs.
+        if (!opts.restoreSavedDesign) {
+            formFields = mergeCustomerFormFields(formFields, await getCustomerFormFields(opts.productId));
+        }
         _currentTemplateName = opts.templateName || '';
         _currentShopToken = opts.shopToken || '';
         _activePanelOpts = opts; // always update so callbacks dispatch to the current project
@@ -1554,7 +1611,12 @@ define(['jquery', 'mage/url', 'mage/translate'], function ($, mageUrl, $t) {
             var variantOptions = cfg.variantOptions || [];
             var customOptions = cfg.customOptions || [];
 
-            import(cfg.slimLoaderUrl || DEFAULT_SLIM_LOADER_URL).then(function (slimModule) {
+            Promise.all([
+                import(cfg.slimLoaderUrl || DEFAULT_SLIM_LOADER_URL),
+                getCustomerFormFields(cfg.productId)
+            ]).then(function (loaded) {
+                var slimModule = loaded[0];
+                var customerFields = loaded[1];
                 var slimCfg = {
                     previewContainer: document.querySelector('.printess-preview'),
                     uiContainer: document.querySelector('.printess-ui'),
@@ -1570,6 +1632,8 @@ define(['jquery', 'mage/url', 'mage/translate'], function ($, mageUrl, $t) {
                 if (cfg.magicPhotobookTheme) {
                     slimCfg.formFields = withPhotobookTheme(slimCfg.formFields, cfg.magicPhotobookTheme);
                 }
+                // RMC-04: customer's RM_CUST (etc.) for this store view
+                slimCfg.formFields = mergeCustomerFormFields(slimCfg.formFields, customerFields);
                 if (cfg.printSettings) slimCfg.printSettings = cfg.printSettings;
                 if (cfg.mergeTemplates && cfg.mergeTemplates.length) slimCfg.attach = { mergeTemplates: cfg.mergeTemplates };
 

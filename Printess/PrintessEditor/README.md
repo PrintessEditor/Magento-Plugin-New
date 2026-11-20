@@ -466,6 +466,42 @@ for customer, Approved, Ordered), with search. On a submission they can:
 
 ---
 
+## Customer form fields per store view (RM_CUST)
+
+A customer can have an identifier per store view that is filled into the hidden Printess form field **RM_CUST** of
+every new design they start in that store view (useful when one customer account logs into several stores of the
+same Magento installation).
+
+- **Set it:** Admin → Customers → All Customers → edit a customer → **Printess** tab. One RM_CUST input per store view
+  the customer can log into (all store views with global customer accounts, otherwise the store views of the
+  customer's website). Click **Save Printess fields** (saved separately from the customer form). Empty = no value.
+- **Where it is used:** new designs in the Panel editor (Personalise, Edit & Reorder of an expired design) and the
+  Slim UI. The value overrides a predefined product form field of the same name.
+- **Saved designs keep their value:** Continue Editing, cart Customize, Edit & Reorder of an existing design and the
+  supervisor's editor open the design as it was saved.
+- The value is set in the browser and not checked on the server.
+- Storage: table `printess_customer_form_field` (customer, store view, field name, value). Deleting a customer or store
+  view removes its values. Frontend endpoint: `GET /printess/customer/fields` (never cached).
+
+## Prefill user data
+
+Products can fill the logged-in customer's account data into template form fields (e.g. a business card template
+with `firstName`, `email`, `phone` fields).
+
+- **Set it up:** Admin → Catalog → Products → edit a product → **Printess** group → switch on **Prefill User Data**.
+  Below it, **User Data Form Fields** lists every form field of the product's template (including the base template).
+  Choose for each field what to fill in, or leave **— none —**. Both settings are per store view.
+- **Available data:** first name, last name, full name, email (customer account); phone, company, street (all lines,
+  line 1, line 2), postcode, city, state/province, country (name in the store's language), country code, full address
+  (multi-line: company, street lines, postcode + city, country) from the **default billing address**.
+- **Rules:** new designs only (saved designs keep what they had); a mapped value overrides Predefined Form Fields,
+  variant/option values and RM_CUST of the same name; an empty value (e.g. no phone, no billing address) leaves the
+  other value in place. Guests get nothing.
+- Fields that were mapped but no longer exist in the template are shown with a warning and can be removed.
+- Frontend endpoint: `GET /printess/customer/fields?product=<id>` (never cached; RM_CUST plus the mapped values).
+
+---
+
 ## URL Endpoints
 
 | URL | Method | Description |

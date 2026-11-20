@@ -12,7 +12,15 @@
 .pff-warning{font-size:12px;padding:4px 8px;border-radius:3px;margin-top:3px}
 .pff-warning--missing{background:#fff3cd;border:1px solid #f0c040;color:#856404}
 .pff-warning--priceRelevant{background:#cce5ff;border:1px solid #79b8f3;color:#004085}
+.pff-default-warning{font-size:13px;padding:8px 10px;border-radius:3px;margin-bottom:10px;background:#fff3cd;border:1px solid #f0c040;color:#856404}
 </style>
+
+<!-- ko if: showDefaultWarning() -->
+<div class="pff-default-warning" role="alert">
+    <strong>&#9888; This store view uses the default value.</strong>
+    Your changes to the form fields will not be saved. Untick &ldquo;Use Default Value&rdquo; below the list to keep them for this store view.
+</div>
+<!-- /ko -->
 
 <!-- ko if: loadingFields() -->
 <div class="pff-status">Loading form fields from Printess&hellip;</div>
@@ -42,6 +50,7 @@
             <!-- ko if: $parent.availableFields().length -->
             <select class="admin__control-select"
                     data-bind="value: fieldName,
+                               event: {change: function (d, e) { return $parent.markEdited(e); }},
                                options: $parent.availableFieldOptions(),
                                optionsValue: 'value',
                                optionsText: 'label'">
@@ -50,13 +59,15 @@
             <!-- ko ifnot: $parent.availableFields().length -->
             <input type="text" class="admin__control-text"
                    placeholder="Form field name"
-                   data-bind="value: fieldName, valueUpdate: 'input'"/>
+                   data-bind="value: fieldName, valueUpdate: 'input',
+                              event: {input: function (d, e) { return $parent.markEdited(e); }}"/>
             <!-- /ko -->
         </div>
         <div class="pff-col-value">
             <!-- ko if: entries().length -->
             <select class="admin__control-select"
                     data-bind="value: fieldValue,
+                               event: {change: function (d, e) { return $parent.markEdited(e); }},
                                options: entries(),
                                optionsValue: 'key',
                                optionsText: 'displayLabel',
@@ -66,7 +77,8 @@
             <!-- ko ifnot: entries().length -->
             <input type="text" class="admin__control-text"
                    placeholder="Value"
-                   data-bind="value: fieldValue, valueUpdate: 'input'"/>
+                   data-bind="value: fieldValue, valueUpdate: 'input',
+                              event: {input: function (d, e) { return $parent.markEdited(e); }}"/>
             <!-- /ko -->
         </div>
         <div class="pff-col-del">
