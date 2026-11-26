@@ -89,7 +89,12 @@ define([
 
         onTemplateChange: function (templateName) {
             if (templateName === this._lastLoadedTemplate) { return; }
+            var hadTemplate = !!this._lastLoadedTemplate;
             this._lastLoadedTemplate = templateName;
+            // Template removed: predefined values belong to the old template.
+            if (hadTemplate && !templateName) {
+                this.clearRows();
+            }
             this.availableFields([]);
             this.fieldsError('');
             if (templateName) {
@@ -151,6 +156,11 @@ define([
             });
 
             return {fieldName: fieldName, fieldValue: fieldValue, entries: entries};
+        },
+
+        clearRows: function () {
+            this.rows([]);
+            this.value([]);
         },
 
         addRow: function () {
