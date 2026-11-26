@@ -1,8 +1,10 @@
 define([
     'Magento_Ui/js/form/element/abstract',
     'ko',
-    'jquery'
-], function (Abstract, ko, $) {
+    'jquery',
+    'uiRegistry',
+    'Magento_Ui/js/modal/confirm'
+], function (Abstract, ko, $, registry, confirm) {
     'use strict';
 
     var PRINTESS_API_BASE = 'https://api.printess.com';
@@ -71,7 +73,10 @@ define([
             endpointTags:        '',
             endpointKeywords:    '',
             endpointSnippets:    '',
-            showSnippetsTab:     true
+            showSnippetsTab:     true,
+            // Only the main product template sets this: clearing it also empties the
+            // Merge Templates, Page Pricing Rules and Predefined Form Fields, which depend on it.
+            clearDependentsOnClear: false
         },
 
         initialize: function () {
@@ -146,6 +151,76 @@ define([
                 this.value('sid~' + this.selectedSnippet().id);
             }
             this.pickerOpen(false);
+        },
+
+        /**
+         * Red "X" next to the field: removes the selected template. For the main
+         * template this also empties Merge Templates, Page Pricing Rules and Predefined
+         * Form Fields (asking first if any exist). The server clears them as well
+         * when the product is saved with an empty template — see the backend models.
+         */
+        clearSelection: function () {
+            var self = this;
+            if (!this.value()) { return; }
+
+            if (!this.clearDependentsOnClear) {
+                this.value('');
+                return;
+            }
+
+            var merges  = this._dependent('printess_merge_templates_grid');
+            var pricing = this._dependent('printess_page_pricing');
+            var fields  = this._dependent('printess_form_fields');
+            var mergeCount   = this._rowCount(merges, 'mergeTemplate');
+            var pricingCount = this._rowCount(pricing);
+            var fieldsCount = fields && typeof fields.rows === 'function' ? fields.rows().length : 0;
+
+            var doClear = function () {
+                self.value('');
+                [merges, pricing].forEach(function (rows) {
+                    if (rows && typeof rows.recordData === 'function' && rows.recordData().length) {
+                        rows.recordData([]);
+                        rows.reload();
+                    }
+                });
+                if (fields && typeof fields.clearRows === 'function') {
+                    fields.clearRows();
+                }
+            };
+
+            if (!mergeCount && !pricingCount && !fieldsCount) {
+                doClear();
+                return;
+            }
+
+            var parts = [];
+            if (mergeCount)   { parts.push(mergeCount + ' merge template' + (mergeCount === 1 ? '' : 's')); }
+            if (pricingCount) { parts.push(pricingCount + ' page pricing rule' + (pricingCount === 1 ? '' : 's')); }
+            if (fieldsCount)  { parts.push(fieldsCount + ' predefined form field' + (fieldsCount === 1 ? '' : 's')); }
+
+            confirm({
+                title: 'Remove Printess template?',
+                content: 'This will also remove ' + this._joinList(parts) + ' from this product. '
+                    + 'The change takes effect when you save the product.',
+                actions: { confirm: doClear }
+            });
+        },
+
+        /** Non-deleted rows of a dynamicRows component (optionally only rows where `requiredKey` is filled). */
+        _rowCount: function (rows, requiredKey) {
+            if (!rows || typeof rows.recordData !== 'function') { return 0; }
+            return (rows.recordData() || []).filter(function (r) {
+                return r && !r['delete'] && (!requiredKey || String(r[requiredKey] || '').trim() !== '');
+            }).length;
+        },
+
+        _joinList: function (parts) {
+            if (parts.length < 2) { return parts.join(''); }
+            return parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1];
+        },
+
+        _dependent: function (index) {
+            return registry.get('index = ' + index + ', provider = ' + this.provider) || null;
         },
 
         selectDirectory: function (dirId) {

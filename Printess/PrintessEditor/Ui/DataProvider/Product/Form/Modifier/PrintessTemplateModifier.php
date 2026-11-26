@@ -42,7 +42,7 @@ class PrintessTemplateModifier extends AbstractModifier
             $meta = $this->arrayManager->merge(
                 $templatePath . '/arguments/data/config',
                 $meta,
-                array_merge($pickerConfig, ['showSnippetsTab' => false])
+                array_merge($pickerConfig, ['showSnippetsTab' => false, 'clearDependentsOnClear' => true])
             );
         }
 

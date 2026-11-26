@@ -98,7 +98,12 @@ define([
 
         onTemplateChange: function (templateName) {
             if (templateName === this._lastLoadedTemplate) { return; }
+            var hadTemplate = !!this._lastLoadedTemplate;
             this._lastLoadedTemplate = templateName;
+            // Template removed: predefined values belong to the old template.
+            if (hadTemplate && !templateName) {
+                this.clearRows();
+            }
             this.hasTemplate(!!templateName);
             this.availableFields([]);
             this.fieldsError('');
@@ -243,6 +248,11 @@ define([
                     alert('Could not generate Customisable Options: ' + (res.error || 'Unknown error'));
                 }
             });
+        },
+
+        clearRows: function () {
+            this.rows([]);
+            this.value([]);
         },
 
         addRow: function () {

@@ -32,6 +32,13 @@ class PagePricing extends AbstractBackend
                 }
 
                 $postProduct = $this->request->getPostValue('product');
+                if ($this->isTemplateCleared($postProduct, $useDefault)) {
+                    // No Printess template any more → rules tied to it are dropped.
+                    // (An emptied dynamic-rows list is not posted at all, so this cannot
+                    // rely on the field itself arriving empty.)
+                    $object->setData($code, '[]');
+                    return;
+                }
                 if (is_array($postProduct) && array_key_exists($code, $postProduct)) {
                     $value = $postProduct[$code];
                 }
@@ -64,6 +71,21 @@ class PagePricing extends AbstractBackend
         } else {
             $object->setData($code, '[]');
         }
+    }
+
+    /**
+     * True when the admin form is saved with an empty Printess template that is not
+     * inherited from the default scope ("Use Default Value" unchecked).
+     */
+    private function isTemplateCleared(mixed $postProduct, mixed $useDefault): bool
+    {
+        if (!is_array($postProduct) || !array_key_exists('printess_template', $postProduct)) {
+            return false;
+        }
+        if (is_array($useDefault) && !empty($useDefault['printess_template'])) {
+            return false;
+        }
+        return trim((string)$postProduct['printess_template']) === '';
     }
 
     public function afterLoad($object): void

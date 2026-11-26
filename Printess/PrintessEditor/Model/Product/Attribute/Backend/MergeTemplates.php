@@ -29,6 +29,11 @@ class MergeTemplates extends AbstractBackend
                 }
 
                 $postProduct = $this->request->getPostValue('product');
+                if ($this->isTemplateCleared($postProduct, $useDefault)) {
+                    // No main Printess template any more → nothing to merge onto.
+                    $object->setData($code, null);
+                    return;
+                }
                 if (is_array($postProduct)) {
                     $value = array_key_exists($code, $postProduct) ? $postProduct[$code] : [];
                 }
@@ -57,6 +62,21 @@ class MergeTemplates extends AbstractBackend
         } else {
             $object->setData($code, null);
         }
+    }
+
+    /**
+     * True when the admin form is saved with an empty Printess template that is not
+     * inherited from the default scope ("Use Default Value" unchecked).
+     */
+    private function isTemplateCleared(mixed $postProduct, mixed $useDefault): bool
+    {
+        if (!is_array($postProduct) || !array_key_exists('printess_template', $postProduct)) {
+            return false;
+        }
+        if (is_array($useDefault) && !empty($useDefault['printess_template'])) {
+            return false;
+        }
+        return trim((string)$postProduct['printess_template']) === '';
     }
 
     public function afterLoad($object): void
